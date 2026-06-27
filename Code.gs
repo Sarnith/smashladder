@@ -198,15 +198,24 @@ function writeSessionTabs_(ss,S){
 }
 
 // ── ONE-TIME migration from the old "Badminton Dashboard.xlsx" ──────────
-// Brings over the player roster + their current rank only (re-sequenced to
-// a clean 1..N — the old sheet had gaps from past player removals). Wins/
-// losses/points start fresh at 0; no historical session/game data is
-// migrated, since the old sheet never recorded who partnered with whom in
-// each doubles match, so any reconstruction would be guessed, not real.
+// Brings over the player roster + current rank (re-sequenced to a clean
+// 1..N — the old sheet had gaps from past player removals), PLUS 4
+// historical session entries (one per week recorded in the old Dashboard
+// sheet) carrying date + rank changes + absentees, so History/Dashboard
+// have continuity. Wins/losses/points start fresh at 0, and no game/court
+// data is included for these historical weeks — the old sheet never
+// recorded who partnered with whom in each doubles match, so any
+// reconstruction of actual games would be guessed, not real.
+//
+// Absentees for 31 May and 24 May come directly from the old sheet's own
+// "Players Absent" lists. The two oldest weeks (17 May, 10 May) never had
+// that column — their absentees are INFERRED as "anyone whose rank moved
+// by exactly -2", since that's our app's own skip-penalty rule, and it
+// matched the two confirmed weeks with zero discrepancies (16/16 names).
 //
 // HOW TO RUN: select "migrateFromOldDashboard_" in the function dropdown
 // above this editor, click Run (▶), authorize if asked. Check the
-// Dashboard tab afterward to confirm.
+// Dashboard and History tabs afterward to confirm.
 //
 // WARNING: this completely OVERWRITES current players/sessions in this
 // Sheet — only run it before you start using the app for real, or if
@@ -214,10 +223,54 @@ function writeSessionTabs_(ss,S){
 function migrateFromOldDashboard_(){
   const names=['Nishan','Nathish','Noel','Vags','Monit','Karthick R','Will','Jaideep','Shirish','Vijay',
     'Arjun','Amit','Karthick V','Indi','Muhunthan','Dinesh','Harsha','Basheer','John','Koushik'];
+  const idOf={};names.forEach((n,i)=>idOf[n]=i+1);
+
+  // Weekly rank snapshots from the old Dashboard sheet: [31May,24May,17May,10May].
+  // null = not yet on the ladder that week (shown as '-' in the old sheet).
+  const weeklyRanks={
+    Nishan:[1,7,5,3],Nathish:[2,3,1,2],Noel:[3,1,9,7],Vags:[4,2,4,null],Monit:[5,11,15,13],
+    'Karthick R':[6,4,2,8],Will:[7,6,3,1],Jaideep:[8,10,8,9],Shirish:[9,13,11,4],Vijay:[10,8,7,5],
+    Arjun:[11,9,null,null],Amit:[12,5,6,6],'Karthick V':[14,12,13,11],Indi:[16,14,14,null],
+    Muhunthan:[17,15,12,10],Dinesh:[18,16,18,16],Harsha:[19,17,10,10],Basheer:[20,18,null,null],
+    John:[21,19,17,14],Koushik:[22,20,16,12]
+  };
+
   const players=names.map((name,i)=>({
-    id:i+1,name,rank:i+1,totalPts:0,wins:0,losses:0,sessions:0,rankDelta:0
+    id:i+1,name,rank:i+1,totalPts:0,wins:0,losses:0,sessions:0,
+    rankDelta:weeklyRanks[name][1]!=null?weeklyRanks[name][1]-weeklyRanks[name][0]:0
   }));
-  const S={players,nextId:players.length+1,activeSession:null,sessions:[]};
+
+  const confirmedAbsent31May=['Noel','Karthick R','Vijay','Arjun','Karthick V','Indi','Muhunthan','Dinesh','Harsha','Basheer','John','Koushik'];
+  const confirmedAbsent24May=['Nishan','Jaideep','Shirish','John'];
+  const inferredAbsent17May=['Karthick R','Jaideep','Shirish','John'];
+  const inferredAbsent10May=[]; // no earlier baseline exists to infer from
+
+  function buildSession(date,idx,prevIdx,skippedNames,isOldest){
+    const attending=[];
+    const rankChanges=isOldest?null:[];
+    names.forEach(name=>{
+      const r=weeklyRanks[name][idx];
+      if(r==null)return;
+      if(skippedNames.indexOf(name)===-1)attending.push(idOf[name]);
+      if(!isOldest){
+        const prevR=weeklyRanks[name][prevIdx];
+        if(prevR!=null)rankChanges.push({name,delta:prevR-r});
+      }
+    });
+    return{
+      date,numRounds:1,rankBasis:'points',round:1,bands:[],rounds:[{courts:[]}],
+      skipped:skippedNames.map(n=>idOf[n]),attending,rankChanges
+    };
+  }
+
+  const sessions=[
+    buildSession('10 May 2026',3,null,inferredAbsent10May,true),
+    buildSession('17 May 2026',2,3,inferredAbsent17May,false),
+    buildSession('24 May 2026',1,2,confirmedAbsent24May,false),
+    buildSession('31 May 2026',0,1,confirmedAbsent31May,false)
+  ];
+
+  const S={players,nextId:players.length+1,activeSession:null,sessions};
   saveState_(S);
-  Logger.log('Migrated '+players.length+' players. Check the Dashboard tab. This function is now safe to delete.');
+  Logger.log('Migrated '+players.length+' players and '+sessions.length+' historical sessions. Check Dashboard + History tabs. This function is now safe to delete.');
 }
