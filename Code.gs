@@ -77,23 +77,34 @@ function loadState_(){
 function saveState_(S){
   const ss=ensureBaseSheets_();
   ss.getSheetByName(DATA_SHEET).getRange(1,1).setValue(JSON.stringify(S));
-  writeDashboard_(ss,S.players||[]);
+  writeDashboard_(ss,S);
   writeSessionTabs_(ss,S);
 }
 
 // ── Dashboard tab ─────────────────────────────────────────────────────
-function writeDashboard_(ss,players){
+// Shows current Rank/Name/Trend/Wins/Losses/Points, PLUS one column per
+// finalized session (newest first) showing each player's rank as of that
+// session — mirrors the old Dashboard sheet's per-week rank-history table.
+function writeDashboard_(ss,S){
+  const players=S.players||[];
+  const sessions=(S.sessions||[]).slice().reverse(); // newest first
   const sh=ss.getSheetByName(DASHBOARD_SHEET);
   sh.clear();
-  const rows=[['Rank','Name','Trend','Wins','Losses','Points']];
+  const header=['Rank','Name','Trend'].concat(sessions.map(s=>s.date)).concat(['Wins','Losses','Points']);
+  const rows=[header];
   [...players].sort((a,b)=>a.rank-b.rank).forEach(p=>{
     const d=p.rankDelta||0;
     const trend=d>0?'▲'+d:d<0?'▼'+Math.abs(d):'—';
-    rows.push([p.rank,p.name,trend,p.wins||0,p.losses||0,p.totalPts||0]);
+    const history=sessions.map(s=>{
+      const r=s.ranksAfter?s.ranksAfter[p.id]:undefined;
+      return r!=null?r:'-';
+    });
+    rows.push([p.rank,p.name,trend].concat(history).concat([p.wins||0,p.losses||0,p.totalPts||0]));
   });
-  sh.getRange(1,1,rows.length,6).setValues(rows);
-  sh.getRange(1,1,1,6).setFontWeight('bold');
-  sh.autoResizeColumns(1,6);
+  const width=header.length;
+  sh.getRange(1,1,rows.length,width).setValues(rows);
+  sh.getRange(1,1,1,width).setFontWeight('bold');
+  sh.autoResizeColumns(1,width);
 }
 
 // ── Per-session tabs ─────────────────────────────────────────────────
@@ -248,9 +259,11 @@ function migrateFromOldDashboard_(){
   function buildSession(date,idx,prevIdx,skippedNames,isOldest){
     const attending=[];
     const rankChanges=isOldest?null:[];
+    const ranksAfter={};
     names.forEach(name=>{
       const r=weeklyRanks[name][idx];
       if(r==null)return;
+      ranksAfter[idOf[name]]=r;
       if(skippedNames.indexOf(name)===-1)attending.push(idOf[name]);
       if(!isOldest){
         const prevR=weeklyRanks[name][prevIdx];
@@ -259,7 +272,7 @@ function migrateFromOldDashboard_(){
     });
     return{
       date,numRounds:1,rankBasis:'points',round:1,bands:[],rounds:[{courts:[]}],
-      skipped:skippedNames.map(n=>idOf[n]),attending,rankChanges
+      skipped:skippedNames.map(n=>idOf[n]),attending,rankChanges,ranksAfter
     };
   }
 

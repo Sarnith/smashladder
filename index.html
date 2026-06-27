@@ -818,11 +818,13 @@ s.skipped.forEach(id=>{const p=gp(id);if(p)p.rank=Math.min(p.rank+2,S.players.le
 [...S.players].sort((a,b)=>a.rank-b.rank).forEach((p,i)=>p.rank=i+1);
 
 const rankChanges=[];
-S.players.forEach(p=>{p.rankDelta=(oldRanks[p.id]||p.rank)-p.rank;rankChanges.push({name:p.name,delta:p.rankDelta});});
+const ranksAfter={};
+S.players.forEach(p=>{p.rankDelta=(oldRanks[p.id]||p.rank)-p.rank;rankChanges.push({name:p.name,delta:p.rankDelta});ranksAfter[p.id]=p.rank;});
 
 s.rounds.push({courts:s.courts});
 delete s.courts;
 s.rankChanges=rankChanges;
+s.ranksAfter=ranksAfter;
 S.sessions.push({...s});
 S.activeSession=null;
 save();showTab('ladder');toast('Rankings updated! 🏆');
