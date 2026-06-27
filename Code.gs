@@ -10,15 +10,20 @@
 // 6. Authorize when prompted (first time only).
 // 7. Copy the Web App URL it gives you and paste it into the app's Settings tab.
 //    The app will then prompt for the username/password you set below.
-// The four tabs (Players/Sessions/Courts/Games) are created automatically on first call.
+//
+// Sheet layout this script maintains:
+//   _Data      — hidden, single JSON blob, the only tab the app actually reads back.
+//   Dashboard  — readable player ladder (Rank/Name/Trend/Wins/Losses/Points).
+//   <date>     — one readable tab per session (current + history), showing
+//                rounds, courts, games, points/position, skipped players, rank changes.
+// If you redeploy this over an older version that had Players/Sessions/Courts/Games
+// tabs, those get deleted automatically the next time the app saves.
 
 const AUTH_USER='admin';
 const AUTH_PASS='change-me';
-
-const PLAYERS_SHEET='Players';
-const SESSIONS_SHEET='Sessions';
-const COURTS_SHEET='Courts';
-const GAMES_SHEET='Games';
+const DATA_SHEET='_Data';
+const DASHBOARD_SHEET='Dashboard';
+const LEGACY_SHEETS=['Players','Sessions','Courts','Games'];
 
 function checkAuth_(u,p){
   return u===AUTH_USER && p===AUTH_PASS;
@@ -41,124 +46,153 @@ function jsonOut_(obj){
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function ensureSheets_(){
+function def_(){return{players:[],nextId:1,sessions:[],activeSession:null};}
+
+function ensureBaseSheets_(){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
-  const defs={
-    [PLAYERS_SHEET]:['id','name','rank','totalPts','wins','losses','sessions','rankDelta'],
-    [SESSIONS_SHEET]:['sessionId','date','numCourts','numRounds','rankBasis','round','status','skipped','attending','bands','rankChanges'],
-    [COURTS_SHEET]:['sessionId','round','courtIndex','players','maxScore'],
-    [GAMES_SHEET]:['sessionId','round','courtIndex','gameIndex','pair1','pair2','sitOut','s1','s2']
-  };
-  Object.keys(defs).forEach(name=>{
-    let sh=ss.getSheetByName(name);
-    if(!sh)sh=ss.insertSheet(name);
-    if(sh.getRange(1,1).getValue()!==defs[name][0]){
-      sh.clear();
-      sh.getRange(1,1,1,defs[name].length).setValues([defs[name]]);
-    }
+  let data=ss.getSheetByName(DATA_SHEET);
+  if(!data){
+    data=ss.insertSheet(DATA_SHEET);
+    data.getRange(1,1).setValue(JSON.stringify(def_()));
+  }
+  try{data.hideSheet();}catch(err){}
+  if(!ss.getSheetByName(DASHBOARD_SHEET))ss.insertSheet(DASHBOARD_SHEET,1);
+  LEGACY_SHEETS.forEach(name=>{
+    const sh=ss.getSheetByName(name);
+    if(sh)ss.deleteSheet(sh);
   });
   return ss;
 }
 
-function readRows_(ss,name){
-  const sh=ss.getSheetByName(name);
-  const vals=sh.getDataRange().getValues();
-  if(vals.length<2)return[];
-  const headers=vals[0];
-  return vals.slice(1).filter(row=>row.some(v=>v!==''))
-    .map(row=>{const obj={};headers.forEach((h,i)=>obj[h]=row[i]);return obj;});
-}
-
-function writeRows_(ss,name,rows){
-  const sh=ss.getSheetByName(name);
-  const lastRow=sh.getMaxRows();
-  if(lastRow>1)sh.getRange(2,1,lastRow-1,sh.getMaxColumns()).clearContent();
-  if(!rows.length)return;
-  sh.getRange(2,1,rows.length,rows[0].length).setValues(rows);
-}
-
 function loadState_(){
-  const ss=ensureSheets_();
-  const players=readRows_(ss,PLAYERS_SHEET).map(r=>({
-    id:Number(r.id),name:r.name,rank:Number(r.rank),totalPts:Number(r.totalPts)||0,
-    wins:Number(r.wins)||0,losses:Number(r.losses)||0,sessions:Number(r.sessions)||0,rankDelta:Number(r.rankDelta)||0
-  }));
-  const sessionRows=readRows_(ss,SESSIONS_SHEET);
-  const courtRows=readRows_(ss,COURTS_SHEET);
-  const gameRows=readRows_(ss,GAMES_SHEET);
-
-  function buildSession(sr){
-    const sid=sr.sessionId;
-    const cRows=courtRows.filter(c=>c.sessionId===sid);
-    const maxRound=cRows.reduce((m,c)=>Math.max(m,Number(c.round)),0);
-    const rounds=[];
-    for(let rnd=1;rnd<=maxRound;rnd++){
-      const thisCourts=cRows.filter(c=>Number(c.round)===rnd).sort((a,b)=>Number(a.courtIndex)-Number(b.courtIndex));
-      const courts=thisCourts.map(c=>{
-        const courtPlayers=JSON.parse(c.players||'[]');
-        const games=gameRows.filter(g=>g.sessionId===sid&&Number(g.round)===rnd&&Number(g.courtIndex)===Number(c.courtIndex))
-          .sort((a,b)=>Number(a.gameIndex)-Number(b.gameIndex))
-          .map(g=>({pair1:JSON.parse(g.pair1),pair2:JSON.parse(g.pair2),sitOut:g.sitOut===''?null:Number(g.sitOut),s1:g.s1===''?null:Number(g.s1),s2:g.s2===''?null:Number(g.s2)}));
-        return{players:courtPlayers,games,maxScore:Number(c.maxScore)||21};
-      });
-      rounds.push({courts});
-    }
-    const isActive=sr.status==='active';
-    const obj={
-      date:sr.date,
-      numRounds:Number(sr.numRounds),
-      rankBasis:sr.rankBasis,
-      round:Number(sr.round),
-      bands:JSON.parse(sr.bands||'[]'),
-      skipped:JSON.parse(sr.skipped||'[]'),
-      attending:JSON.parse(sr.attending||'[]')
-    };
-    if(isActive){
-      obj.courts=rounds.length?rounds[rounds.length-1].courts:[];
-      obj.rounds=rounds.slice(0,-1);
-    }else{
-      obj.rounds=rounds;
-      obj.rankChanges=JSON.parse(sr.rankChanges||'null');
-    }
-    return obj;
+  const ss=ensureBaseSheets_();
+  const raw=ss.getSheetByName(DATA_SHEET).getRange(1,1).getValue();
+  try{
+    return raw?JSON.parse(raw):def_();
+  }catch(err){
+    return def_();
   }
-
-  const activeRow=sessionRows.find(s=>s.status==='active');
-  const activeSession=activeRow?buildSession(activeRow):null;
-  const sessions=sessionRows.filter(s=>s.status==='finalized').map(buildSession);
-  const nextId=players.reduce((m,p)=>Math.max(m,p.id),0)+1;
-
-  return{players,nextId,activeSession,sessions};
 }
 
 function saveState_(S){
-  const ss=ensureSheets_();
-  const playerRows=(S.players||[]).map(p=>[p.id,p.name,p.rank,p.totalPts||0,p.wins||0,p.losses||0,p.sessions||0,p.rankDelta||0]);
-  writeRows_(ss,PLAYERS_SHEET,playerRows);
+  const ss=ensureBaseSheets_();
+  ss.getSheetByName(DATA_SHEET).getRange(1,1).setValue(JSON.stringify(S));
+  writeDashboard_(ss,S.players||[]);
+  writeSessionTabs_(ss,S);
+}
 
-  const sessionRows=[],courtRows=[],gameRows=[];
-  let sidCounter=1;
+// ── Dashboard tab ─────────────────────────────────────────────────────
+function writeDashboard_(ss,players){
+  const sh=ss.getSheetByName(DASHBOARD_SHEET);
+  sh.clear();
+  const rows=[['Rank','Name','Trend','Wins','Losses','Points']];
+  [...players].sort((a,b)=>a.rank-b.rank).forEach(p=>{
+    const d=p.rankDelta||0;
+    const trend=d>0?'▲'+d:d<0?'▼'+Math.abs(d):'—';
+    rows.push([p.rank,p.name,trend,p.wins||0,p.losses||0,p.totalPts||0]);
+  });
+  sh.getRange(1,1,rows.length,6).setValues(rows);
+  sh.getRange(1,1,1,6).setFontWeight('bold');
+  sh.autoResizeColumns(1,6);
+}
 
-  function flatten(s,status){
-    const sid=sidCounter++;
-    const roundsArr=status==='active'?[...(s.rounds||[]),{courts:s.courts||[]}]:(s.rounds||[]);
-    sessionRows.push([sid,s.date,(s.bands||[]).length,s.numRounds,s.rankBasis,s.round,status,
-      JSON.stringify(s.skipped||[]),JSON.stringify(s.attending||[]),JSON.stringify(s.bands||[]),
-      JSON.stringify(s.rankChanges||null)]);
-    roundsArr.forEach((r,ri)=>{
-      (r.courts||[]).forEach((c,ci)=>{
-        courtRows.push([sid,ri+1,ci,JSON.stringify(c.players||[]),c.maxScore||21]);
-        (c.games||[]).forEach((g,gi)=>{
-          gameRows.push([sid,ri+1,ci,gi,JSON.stringify(g.pair1||[]),JSON.stringify(g.pair2||[]),g.sitOut===null||g.sitOut===undefined?'':g.sitOut,g.s1===null?'':g.s1,g.s2===null?'':g.s2]);
-        });
+// ── Per-session tabs ─────────────────────────────────────────────────
+function nameOf_(players,id){
+  const p=(players||[]).find(p=>p.id===id);
+  return p?p.name:'?';
+}
+
+function sessionRowBlock_(session,players){
+  const rows=[];
+  rows.push(['Date',session.date,'Rounds',session.numRounds,'Ranking basis',session.rankBasis||'points']);
+  rows.push([]);
+  const roundsArr=session.rounds&&session.rounds.length?[...session.rounds]:[];
+  if(session.courts)roundsArr.push({courts:session.courts}); // current/last round if active
+  roundsArr.forEach((r,ri)=>{
+    rows.push(['ROUND '+(ri+1)]);
+    r.courts.forEach((c,ci)=>{
+      rows.push(['Court '+(ci+1)+':',c.players.map(id=>nameOf_(players,id)).join(', ')]);
+      rows.push(['Game','Pair 1','Score','Score','Pair 2','Sitting Out']);
+      const ptMap={};
+      c.players.forEach(id=>ptMap[id]=0);
+      c.games.forEach((g,gi)=>{
+        const scored=g.s1!==null&&g.s2!==null;
+        rows.push(['G'+(gi+1),
+          g.pair1.map(id=>nameOf_(players,id)).join(' & '),
+          scored?g.s1:'',
+          scored?g.s2:'',
+          g.pair2.map(id=>nameOf_(players,id)).join(' & '),
+          g.sitOut!=null?nameOf_(players,g.sitOut):'']);
+        if(scored){
+          g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
+          g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
+        }
       });
+      rows.push([]);
+      rows.push(['Player','Points']);
+      [...c.players].sort((a,b)=>(ptMap[b]||0)-(ptMap[a]||0)).forEach(id=>{
+        rows.push([nameOf_(players,id),ptMap[id]||0]);
+      });
+      rows.push([]);
     });
+  });
+  if(session.skipped&&session.skipped.length){
+    rows.push(['Skipped (-2 ranks):',session.skipped.map(id=>nameOf_(players,id)).join(', ')]);
+    rows.push([]);
   }
+  if(session.rankChanges){
+    const changes=session.rankChanges.filter(r=>r.delta!==0);
+    if(changes.length){
+      rows.push(['Rank changes:',changes.map(r=>r.name+' '+(r.delta>0?'▲'+r.delta:'▼'+Math.abs(r.delta))).join(', ')]);
+    }
+  }
+  return rows;
+}
 
-  if(S.activeSession)flatten(S.activeSession,'active');
-  (S.sessions||[]).forEach(s=>flatten(s,'finalized'));
+function sanitizeSheetName_(name){
+  return String(name).replace(/[\[\]\*\/\\\?:]/g,'').slice(0,90);
+}
 
-  writeRows_(ss,SESSIONS_SHEET,sessionRows);
-  writeRows_(ss,COURTS_SHEET,courtRows);
-  writeRows_(ss,GAMES_SHEET,gameRows);
+function writeSessionTabs_(ss,S){
+  const players=S.players||[];
+  const wanted=[]; // [{name, rows}]
+  const usedNames={};
+  function uniqueName(base){
+    let name=sanitizeSheetName_(base),i=2;
+    while(usedNames[name]){name=sanitizeSheetName_(base)+' ('+i+')';i++;}
+    usedNames[name]=true;
+    return name;
+  }
+  if(S.activeSession){
+    wanted.push({name:uniqueName(S.activeSession.date+' (Live)'),rows:sessionRowBlock_(S.activeSession,players)});
+  }
+  (S.sessions||[]).slice().reverse().forEach(s=>{
+    wanted.push({name:uniqueName(s.date),rows:sessionRowBlock_(s,players)});
+  });
+
+  const keepNames={};
+  wanted.forEach((w,i)=>{
+    keepNames[w.name]=true;
+    let sh=ss.getSheetByName(w.name);
+    if(!sh){
+      sh=ss.insertSheet(w.name,1+i);
+    }else{
+      sh.clear();
+      ss.setActiveSheet(sh);
+      ss.moveActiveSheet(1+i);
+    }
+    if(w.rows.length){
+      const width=Math.max(...w.rows.map(r=>r.length),1);
+      const padded=w.rows.map(r=>{const row=r.slice();while(row.length<width)row.push('');return row;});
+      sh.getRange(1,1,padded.length,width).setValues(padded);
+    }
+    sh.autoResizeColumns(1,8);
+  });
+
+  ss.getSheets().forEach(sh=>{
+    const name=sh.getName();
+    if(name===DATA_SHEET||name===DASHBOARD_SHEET||keepNames[name])return;
+    if(LEGACY_SHEETS.indexOf(name)!==-1)return; // already handled in ensureBaseSheets_
+    ss.deleteSheet(sh);
+  });
 }
