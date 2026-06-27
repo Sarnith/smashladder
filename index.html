@@ -333,8 +333,7 @@ const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
-let cr=[1,2,3].map(n=>'<button class="score-opt'+(n===2?' active':'')+'" data-courts="'+n+'">'+n+' Court'+(n>1?'s':'')+'</button>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Courts</div><div style="display:flex;gap:7px;" id="courts-row">'+cr+'</div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Singles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
@@ -344,12 +343,9 @@ else{setup.attending.add(pid);c.classList.add('attending');}
 updatePreview();
 });
 });
-m.querySelectorAll('[data-courts]').forEach(b=>{
-b.addEventListener('click',()=>{
-setup.numCourts=Number(b.dataset.courts);
-m.querySelectorAll('[data-courts]').forEach(x=>x.classList.toggle('active',x===b));
+el('courts-input').addEventListener('input',()=>{
+setup.numCourts=Math.max(1,parseInt(el('courts-input').value)||1);
 updatePreview();
-});
 });
 el('modal-close-btn').addEventListener('click',closeModal);
 el('cancel-modal-btn').addEventListener('click',closeModal);
@@ -360,9 +356,10 @@ function updatePreview(){
 const n=setup.attending.size,c=setup.numCourts;
 const pv=el('modal-preview');if(!pv)return;
 if(n<4){pv.textContent='Need at least 4 attending players.';return;}
-const base=Math.floor(n/c),extra=n%c;
-const groups=Array.from({length:c},(_,i)=>base+(i<extra?1:0));
-pv.textContent=n+' players → '+groups.map((g,i)=>'Court '+(i+1)+': '+g+' players').join(', ');
+if(c<1){pv.textContent='Need at least 1 court.';return;}
+const sizes=courtSizes(n,c);
+if(sizes[0]<2){pv.textContent='Too many courts for '+n+' players — reduce court count (each court needs ≥2 players).';return;}
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players').join(', ');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
