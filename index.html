@@ -321,11 +321,11 @@ save();renderPlayers();toast(target.name+' moved to #'+newRank);
 }
 
 // ── Session setup ─────────────────────────────────────────────────────
-let setup={attending:new Set(),numCourts:2,numRounds:2};
+let setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points'};
 function openSessionModal(){
 if(S.activeSession){toast('Finish the active session first');showTab('session');return;}
 if(S.players.length<4){toast('Add at least 4 players first');return;}
-setup={attending:new Set(),numCourts:2,numRounds:2};
+setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points'};
 buildModal();
 }
 function buildModal(){
@@ -333,7 +333,8 @@ const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Singles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+let rb=[{v:'points',l:'Points'},{v:'wins',l:'Wins then Points'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Singles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div><div class="section-label" style="margin-bottom:7px;">Number of Rounds</div><input type="number" id="rounds-input" class="add-input" style="max-width:90px;" min="1" max="10" value="'+setup.numRounds+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
@@ -347,6 +348,16 @@ el('courts-input').addEventListener('input',()=>{
 setup.numCourts=Math.max(1,parseInt(el('courts-input').value)||1);
 updatePreview();
 });
+el('rounds-input').addEventListener('input',()=>{
+setup.numRounds=Math.max(1,parseInt(el('rounds-input').value)||1);
+updatePreview();
+});
+m.querySelectorAll('[data-rankbasis]').forEach(b=>{
+b.addEventListener('click',()=>{
+setup.rankBasis=b.dataset.rankbasis;
+m.querySelectorAll('[data-rankbasis]').forEach(x=>x.classList.toggle('active',x===b));
+});
+});
 el('modal-close-btn').addEventListener('click',closeModal);
 el('cancel-modal-btn').addEventListener('click',closeModal);
 el('start-session-btn').addEventListener('click',startSession);
@@ -359,7 +370,7 @@ if(n<4){pv.textContent='Need at least 4 attending players.';return;}
 if(c<1){pv.textContent='Need at least 1 court.';return;}
 const sizes=courtSizes(n,c);
 if(sizes[0]<2){pv.textContent='Too many courts for '+n+' players — reduce court count (each court needs ≥2 players).';return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players').join(', ');
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players').join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
@@ -391,9 +402,16 @@ function startSession(){
 const att=[...setup.attending];
 if(att.length<4){toast('Need at least 4 players');return;}
 if(courtSizes(att.length,setup.numCourts)[0]<2){toast('Reduce court count — each court needs at least 2 players');return;}
+const courts=buildCourts(att,setup.numCourts);
+const bands=courts.map(c=>c.players.map(id=>gp(id).rank).sort((a,b)=>a-b));
 S.activeSession={
 date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
-courts:buildCourts(att,setup.numCourts),
+numRounds:setup.numRounds,
+rankBasis:setup.rankBasis,
+round:1,
+bands:bands,
+courts:courts,
+rounds:[],
 skipped:S.players.map(p=>p.id).filter(id=>!setup.attending.has(id)),
 attending:att
 };
@@ -414,7 +432,7 @@ const allDone=doneG===totalG;
 const pct=totalG?Math.round(doneG/totalG*100):0;
 
 let h='<div class="session-panel">'
-+'<div class="session-title">Session — '+s.date+'</div>'
++'<div class="session-title">Session — '+s.date+' · Round '+s.round+' of '+s.numRounds+'</div>'
 +'<div class="session-meta">'+s.courts.length+' court'+(s.courts.length>1?'s':'')+' · '+s.attending.length+' playing · '+doneG+'/'+totalG+' games scored</div>'
 +'<div class="progress-wrap"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
 
@@ -425,15 +443,23 @@ h+='<div class="confirm-banner"><span class="confirm-banner-msg">Remove <strong>
 +'<div class="confirm-banner-btns"><button class="cbtn-yes" id="sess-confirm-yes">Remove</button><button class="cbtn-no" id="sess-confirm-no">Cancel</button></div></div>';
 }
 
-s.courts.forEach((court,ci)=>{
-const ptMap={};court.players.forEach(id=>ptMap[id]=0);
-court.games.forEach(g=>{
-if(g.s1!==null&&g.s2!==null){
-ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
-ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
-}
+if(s.rounds.length){
+h+='<div class="section-label" style="margin-top:4px;">Previous Rounds</div>';
+s.rounds.forEach((r,ri)=>{
+h+='<div class="card" style="margin-bottom:10px;"><div style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:6px;">Round '+(ri+1)+'</div>';
+r.courts.forEach((c,ci)=>{
+if(ci>0)h+='<hr class="div">';
+h+='<div style="font-size:12px;margin-bottom:4px;"><strong>Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
+c.games.forEach((g,gi)=>{
+h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+nameOf(g.p1)+' '+g.s1+'–'+g.s2+' '+nameOf(g.p2)+'</div>';
 });
-const ranked=[...court.players].sort((a,b)=>(ptMap[b]||0)-(ptMap[a]||0));
+});
+h+='</div>';
+});
+}
+
+s.courts.forEach((court,ci)=>{
+const{ranked,ptMap}=tallyCourt(court,s.rankBasis);
 const numCourts=s.courts.length;
 
 h+='<div class="court-block">'
@@ -491,12 +517,15 @@ if(s.skipped.length){
 h+='<div style="background:var(--red-dim);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;">⚠ Skipped today (−2 ranks): <strong>'+s.skipped.map(id=>nameOf(id)).join(', ')+'</strong></div>';
 }
 
+const isLastRound=s.round>=s.numRounds;
+const btnLabel=isLastRound?'Finalise &amp; Update Rankings':'Complete Round '+s.round+' → Start Round '+(s.round+1);
+const btnId=isLastRound?'finalise-btn':'advance-round-btn';
 h+='<div class="btn-row">'
-+'<button class="btn btn-primary" id="finalise-btn"'+(allDone?'':' disabled')+'>Finalise &amp; Update Rankings</button>'
++'<button class="btn btn-primary" id="'+btnId+'"'+(allDone?'':' disabled')+'>'+btnLabel+'</button>'
 +'<button class="btn btn-danger" id="cancel-session-btn">Cancel Session</button>'
 +'</div>'
 +'<div style="font-size:12px;color:'+(allDone?'var(--green)':'var(--muted)')+';margin-top:8px;">'
-+(allDone?'All games scored — ready to finalise! 🏆':(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining.')
++(allDone?(isLastRound?'All games scored — ready to finalise! 🏆':'Round '+s.round+' complete — ready for the next round! 🏸'):(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining.')
 +'</div></div>';
 
 root.innerHTML=h;
@@ -549,6 +578,8 @@ if(s1===ms||s2===ms){renderSession();}
 
 const fb=el('finalise-btn');
 if(fb)fb.addEventListener('click',finaliseSession);
+const ab=el('advance-round-btn');
+if(ab)ab.addEventListener('click',advanceRound);
 const cb=el('cancel-session-btn');
 if(cb)cb.addEventListener('click',cancelSession);
 }
@@ -570,13 +601,27 @@ pendingRemoveSession=null;
 save();renderSession();toast(name+' removed from session');
 }
 
-// ── Finalise ──────────────────────────────────────────────────────────
-function finaliseSession(){
-const s=S.activeSession;
-const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
-const numCourts=s.courts.length;
-
-const courtTallies=s.courts.map(court=>{
+// ── Per-round computation (shared by advanceRound and finaliseSession) ─
+function tallyCourt(court,rankBasis){
+const ptMap={},winMap={};
+court.players.forEach(id=>{ptMap[id]=0;winMap[id]=0;});
+court.games.forEach(g=>{
+if(g.s1!==null&&g.s2!==null){
+ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
+ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
+if(g.s1>g.s2)winMap[g.p1]++;else winMap[g.p2]++;
+}
+});
+const ranked=[...court.players].sort((a,b)=>{
+if(rankBasis==='wins'){
+const dw=(winMap[b]||0)-(winMap[a]||0);
+if(dw!==0)return dw;
+}
+const d=(ptMap[b]||0)-(ptMap[a]||0);return d!==0?d:gp(a).rank-gp(b).rank;
+});
+return{ranked,ptMap,winMap,players:court.players};
+}
+function accumulateStats(court){
 const ptMap={};court.players.forEach(id=>ptMap[id]=0);
 court.games.forEach(g=>{
 if(g.s1!==null&&g.s2!==null){
@@ -593,30 +638,62 @@ if(p1){p1.losses++;p1.sessions++;}
 }
 });
 court.players.forEach(id=>{const p=gp(id);if(p)p.totalPts=(p.totalPts||0)+(ptMap[id]||0);});
-const ranked=[...court.players].sort((a,b)=>{
-const d=(ptMap[b]||0)-(ptMap[a]||0);return d!==0?d:gp(a).rank-gp(b).rank;
+}
+function computeRoundVirtualRanks(courts,bands,rankBasis){
+const tallies=courts.map(c=>tallyCourt(c,rankBasis));
+const virtual={};
+tallies.forEach((t,ci)=>{
+const slots=[...bands[ci]].sort((a,b)=>a-b);
+t.ranked.forEach((id,i)=>{virtual[id]=slots[i];});
 });
-return{ranked,ptMap,players:court.players};
-});
-
-// Assign ranks within each court
-courtTallies.forEach(({ranked,players})=>{
-const slots=players.map(id=>gp(id).rank).sort((a,b)=>a-b);
-ranked.forEach((id,i)=>{const p=gp(id);if(p)p.rank=slots[i];});
-});
-
-// Promotion/relegation between adjacent courts
-for(let ci=0;ci<numCourts-1;ci++){
-const upper=courtTallies[ci].ranked;
-const lower=courtTallies[ci+1].ranked;
-if(upper.length>=2&&lower.length>=2){
-const bU=[upper[upper.length-2],upper[upper.length-1]];
-const tL=[lower[0],lower[1]];
-const allRanks=[...bU,...tL].map(id=>gp(id).rank).sort((a,b)=>a-b);
+for(let ci=0;ci<courts.length-1;ci++){
+const upperIds=tallies[ci].ranked;
+const lowerIds=tallies[ci+1].ranked;
+if(upperIds.length>=2&&lowerIds.length>=2){
+const bU=[upperIds[upperIds.length-2],upperIds[upperIds.length-1]];
+const tL=[lowerIds[0],lowerIds[1]];
+const allRanks=[...bU,...tL].map(id=>virtual[id]).sort((a,b)=>a-b);
 const ordered=[...tL,...bU];
-ordered.forEach((id,i)=>{const p=gp(id);if(p)p.rank=allRanks[i];});
+ordered.forEach((id,i)=>{virtual[id]=allRanks[i];});
 }
 }
+return virtual;
+}
+function regroupForNextRound(session,virtualRanks){
+const rankToCourtIdx={};
+session.bands.forEach((band,ci)=>band.forEach(r=>rankToCourtIdx[r]=ci));
+const buckets=session.bands.map(()=>[]);
+session.attending.forEach(id=>{
+const vr=virtualRanks[id];
+if(vr===undefined)return;
+const ci=rankToCourtIdx[vr];
+if(ci!==undefined)buckets[ci].push(id);
+});
+return buckets.map((ids,ci)=>{
+const sorted=[...ids].sort((a,b)=>virtualRanks[a]-virtualRanks[b]);
+return{players:sorted,games:roundRobin(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21};
+});
+}
+
+// ── Advance to next round ───────────────────────────────────────────────
+function advanceRound(){
+const s=S.activeSession;
+s.courts.forEach(accumulateStats);
+const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
+s.rounds.push({courts:s.courts});
+s.courts=regroupForNextRound(s,virtual);
+s.round+=1;
+save();renderSession();toast('Round '+(s.round-1)+' complete — Round '+s.round+' started! 🏸');
+}
+
+// ── Finalise ──────────────────────────────────────────────────────────
+function finaliseSession(){
+const s=S.activeSession;
+const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
+
+s.courts.forEach(accumulateStats);
+const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
+s.attending.forEach(id=>{const p=gp(id);if(p&&virtual[id]!==undefined)p.rank=virtual[id];});
 
 // Skip penalty
 s.skipped.forEach(id=>{const p=gp(id);if(p)p.rank=Math.min(p.rank+2,S.players.length);});
@@ -627,6 +704,8 @@ s.skipped.forEach(id=>{const p=gp(id);if(p)p.rank=Math.min(p.rank+2,S.players.le
 const rankChanges=[];
 S.players.forEach(p=>{p.rankDelta=(oldRanks[p.id]||p.rank)-p.rank;rankChanges.push({name:p.name,delta:p.rankDelta});});
 
+s.rounds.push({courts:s.courts});
+delete s.courts;
 s.rankChanges=rankChanges;
 S.sessions.push({...s});
 S.activeSession=null;
@@ -643,13 +722,17 @@ const root=el('tab-history');
 if(!S.sessions.length){root.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No sessions yet.</div>';return;}
 let h='';
 [...S.sessions].reverse().forEach(s=>{
-h+='<div class="history-card"><div class="history-date">'+s.date+' · '+s.courts.length+' court'+(s.courts.length>1?'s':'')+' · '+s.attending.length+' players</div>';
-s.courts.forEach((c,ci)=>{
+const roundsArr=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
+h+='<div class="history-card"><div class="history-date">'+s.date+' · '+roundsArr.length+' round'+(roundsArr.length>1?'s':'')+' · '+roundsArr[0].courts.length+' courts · '+s.attending.length+' players</div>';
+roundsArr.forEach((r,ri)=>{
+if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--green);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
+r.courts.forEach((c,ci)=>{
 if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--green)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
 h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+nameOf(g.p1)+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+nameOf(g.p2)+'</div>';
+});
 });
 });
 if(s.skipped&&s.skipped.length)h+='<div style="font-size:11px;color:var(--red);margin-top:6px;">Skipped: '+s.skipped.map(id=>nameOf(id)).join(', ')+'</div>';
