@@ -196,3 +196,28 @@ function writeSessionTabs_(ss,S){
     ss.deleteSheet(sh);
   });
 }
+
+// ── ONE-TIME migration from the old "Badminton Dashboard.xlsx" ──────────
+// Brings over the player roster + their current rank only (re-sequenced to
+// a clean 1..N — the old sheet had gaps from past player removals). Wins/
+// losses/points start fresh at 0; no historical session/game data is
+// migrated, since the old sheet never recorded who partnered with whom in
+// each doubles match, so any reconstruction would be guessed, not real.
+//
+// HOW TO RUN: select "migrateFromOldDashboard_" in the function dropdown
+// above this editor, click Run (▶), authorize if asked. Check the
+// Dashboard tab afterward to confirm.
+//
+// WARNING: this completely OVERWRITES current players/sessions in this
+// Sheet — only run it before you start using the app for real, or if
+// you're fine discarding whatever's already in here.
+function migrateFromOldDashboard_(){
+  const names=['Nishan','Nathish','Noel','Vags','Monit','Karthick R','Will','Jaideep','Shirish','Vijay',
+    'Arjun','Amit','Karthick V','Indi','Muhunthan','Dinesh','Harsha','Basheer','John','Koushik'];
+  const players=names.map((name,i)=>({
+    id:i+1,name,rank:i+1,totalPts:0,wins:0,losses:0,sessions:0,rankDelta:0
+  }));
+  const S={players,nextId:players.length+1,activeSession:null,sessions:[]};
+  saveState_(S);
+  Logger.log('Migrated '+players.length+' players. Check the Dashboard tab. This function is now safe to delete.');
+}
