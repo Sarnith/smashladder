@@ -83,6 +83,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .pair-col.won{background:var(--green-dim);}
 .pair-col.lost{opacity:.4;}
 .pair-names-stacked{text-align:center;font-size:13px;font-weight:700;line-height:1.4;}
+.pair-amp{font-size:11px;color:var(--muted);font-weight:400;}
 .score-inputs{display:flex;align-items:center;gap:6px;margin-top:4px;}
 .score-input{width:48px;height:38px;text-align:center;background:var(--court-mid);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Space Mono',monospace;font-size:18px;font-weight:700;outline:none;}
 .score-input:focus{border-color:var(--green);}
@@ -147,21 +148,113 @@ hr.div{border:none;border-top:1px solid var(--border);margin:10px 0;}
 <button class="tab" data-tab="session">🎮 Session</button>
 <button class="tab" data-tab="history">📋 History</button>
 <button class="tab" data-tab="players">👤 Players</button>
+<button class="tab" data-tab="settings">⚙️ Settings</button>
 </div>
 <div id="tab-ladder"></div>
 <div id="tab-session" style="display:none"></div>
 <div id="tab-history" style="display:none"></div>
 <div id="tab-players" style="display:none"></div>
+<div id="tab-settings" style="display:none"></div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────
 const KEY='smash_v3';
+const BACKEND_KEY='smash_backend_url';
 function def(){return{players:[],nextId:1,sessions:[],activeSession:null};}
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||def();}catch{return def();}}
-function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+function save(){localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();}
 let S=load();
+
+// ── Backend sync (Google Sheet via Apps Script Web App) ─────────────────
+let BACKEND_URL=localStorage.getItem(BACKEND_KEY)||'';
+const AUTH_KEY='smash_auth';
+let CREDS=JSON.parse(localStorage.getItem(AUTH_KEY)||'null');
+let syncTimer=null;
+let syncStatus={state:'idle',msg:''}; // idle|syncing|synced|error
+function scheduleSync(){
+if(!BACKEND_URL||!CREDS)return;
+clearTimeout(syncTimer);
+syncTimer=setTimeout(pushToBackend,800);
+}
+function authedUrl(){
+return BACKEND_URL+(BACKEND_URL.includes('?')?'&':'?')+'u='+encodeURIComponent(CREDS.u)+'&p='+encodeURIComponent(CREDS.p);
+}
+function pushToBackend(){
+if(!BACKEND_URL||!CREDS)return;
+syncStatus={state:'syncing',msg:'Syncing…'};
+if(currentTab==='settings')renderSettings();
+fetch(BACKEND_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({auth:CREDS,data:S})})
+.then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+.then(resp=>{
+if(resp&&resp.error==='unauthorized'){requireLogin('Saved password is no longer valid — please log in again.');return;}
+syncStatus={state:'synced',msg:'Synced '+new Date().toLocaleTimeString()};if(currentTab==='settings')renderSettings();
+})
+.catch(err=>{syncStatus={state:'error',msg:'Sync failed: '+err.message};if(currentTab==='settings')renderSettings();});
+}
+function pullFromBackend(showToast){
+if(!BACKEND_URL||!CREDS)return;
+syncStatus={state:'syncing',msg:'Pulling…'};
+if(currentTab==='settings')renderSettings();
+fetch(authedUrl())
+.then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+.then(data=>{
+if(data&&data.error==='unauthorized'){requireLogin('Saved password is no longer valid — please log in again.');return;}
+S=Object.assign(def(),data);
+localStorage.setItem(KEY,JSON.stringify(S));
+syncStatus={state:'synced',msg:'Pulled '+new Date().toLocaleTimeString()};
+render();
+if(showToast)toast('Loaded from Google Sheet');
+})
+.catch(err=>{syncStatus={state:'error',msg:'Pull failed: '+err.message};if(currentTab==='settings')renderSettings();if(showToast)toast('Pull failed: '+err.message);});
+}
+
+// ── Login gate ────────────────────────────────────────────────────────
+function requireLogin(errMsg){
+CREDS=null;
+localStorage.removeItem(AUTH_KEY);
+showLoginGate(errMsg);
+}
+function showLoginGate(errMsg){
+closeLoginGate();
+const m=document.createElement('div');
+m.className='modal-bg';m.id='login-gate';
+m.innerHTML='<div class="modal"><div class="modal-title">🔒 Sign in</div><div class="modal-sub">This ladder is backed by a shared Google Sheet — sign in to sync.</div>'
++(errMsg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+errMsg+'</div>':'')
++'<input class="add-input" id="login-user" placeholder="Username" style="margin-bottom:8px;">'
++'<input class="add-input" id="login-pass" type="password" placeholder="Password" style="margin-bottom:14px;">'
++'<div class="btn-row"><button class="btn btn-primary" id="login-btn">Sign in</button></div>'
++'<div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div></div>';
+document.body.appendChild(m);
+const tryLogin=()=>{
+const u=el('login-user').value.trim(),p=el('login-pass').value;
+if(!u||!p)return;
+const candidate={u,p};
+fetch(BACKEND_URL+(BACKEND_URL.includes('?')?'&':'?')+'u='+encodeURIComponent(u)+'&p='+encodeURIComponent(p))
+.then(r=>r.json())
+.then(data=>{
+if(data&&data.error==='unauthorized'){el('login-err').textContent='Incorrect username or password.';return;}
+CREDS=candidate;
+localStorage.setItem(AUTH_KEY,JSON.stringify(CREDS));
+S=Object.assign(def(),data);
+localStorage.setItem(KEY,JSON.stringify(S));
+closeLoginGate();
+render();
+toast('Signed in');
+})
+.catch(err=>{el('login-err').textContent='Could not reach backend: '+err.message;});
+};
+el('login-btn').addEventListener('click',tryLogin);
+el('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin();});
+}
+function closeLoginGate(){const m=el('login-gate');if(m)m.remove();}
+function logout(){
+CREDS=null;
+localStorage.removeItem(AUTH_KEY);
+toast('Signed out');
+if(BACKEND_URL)showLoginGate();
+}
 
 // pending remove state
 let pendingRemovePlayer=null; // player id
@@ -177,7 +270,7 @@ document.getElementById('new-session-btn').addEventListener('click',openSessionM
 function showTab(t){
 currentTab=t;
 document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-['ladder','session','history','players'].forEach(x=>
+['ladder','session','history','players','settings'].forEach(x=>
 document.getElementById('tab-'+x).style.display=x===t?'':'none');
 pendingRemovePlayer=null;
 pendingRemoveSession=null;
@@ -188,6 +281,7 @@ if(currentTab==='ladder') renderLadder();
 if(currentTab==='session') renderSession();
 if(currentTab==='history') renderHistory();
 if(currentTab==='players') renderPlayers();
+if(currentTab==='settings') renderSettings();
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────
@@ -334,7 +428,7 @@ const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
 let rb=[{v:'points',l:'Points'},{v:'wins',l:'Wins then Points'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Singles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div><div class="section-label" style="margin-bottom:7px;">Number of Rounds</div><input type="number" id="rounds-input" class="add-input" style="max-width:90px;" min="1" max="10" value="'+setup.numRounds+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div><div class="section-label" style="margin-bottom:7px;">Number of Rounds</div><input type="number" id="rounds-input" class="add-input" style="max-width:90px;" min="1" max="10" value="'+setup.numRounds+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
@@ -369,24 +463,41 @@ const pv=el('modal-preview');if(!pv)return;
 if(n<4){pv.textContent='Need at least 4 attending players.';return;}
 if(c<1){pv.textContent='Need at least 1 court.';return;}
 const sizes=courtSizes(n,c);
-if(sizes[0]<2){pv.textContent='Too many courts for '+n+' players — reduce court count (each court needs ≥2 players).';return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players').join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
+if(!sizesValid(sizes)){pv.textContent='Doubles needs every court to have exactly 4 or 5 players — got '+sizes.join(', ')+'. Adjust attendance or court count.';return;}
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g===5?' (1 sits out each game)':'')).join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
-// ── Pairings ──────────────────────────────────────────────────────────
-function roundRobin(ids){
-const games=[];
-for(let i=0;i<ids.length;i++){
-for(let j=i+1;j<ids.length;j++){
-games.push({p1:ids[i],p2:ids[j],s1:null,s2:null});
+// ── Pairings (doubles round-robin) ──────────────────────────────────────
+function pairings4(ids){
+const[a,b,c,d]=ids;
+return[
+{pair1:[a,b],pair2:[c,d],sitOut:null,s1:null,s2:null},
+{pair1:[a,c],pair2:[b,d],sitOut:null,s1:null,s2:null},
+{pair1:[a,d],pair2:[b,c],sitOut:null,s1:null,s2:null}
+];
 }
+function pairings5(ids){
+const[a,b,c,d,e]=ids;
+return[
+{pair1:[a,b],pair2:[c,d],sitOut:e,s1:null,s2:null},
+{pair1:[a,c],pair2:[b,e],sitOut:d,s1:null,s2:null},
+{pair1:[a,d],pair2:[c,e],sitOut:b,s1:null,s2:null},
+{pair1:[a,e],pair2:[b,d],sitOut:c,s1:null,s2:null},
+{pair1:[b,c],pair2:[d,e],sitOut:a,s1:null,s2:null}
+];
 }
-return games;
+function buildGames(ids){
+if(ids.length===5)return pairings5(ids);
+if(ids.length===4)return pairings4(ids);
+return[];
 }
 function courtSizes(n,numCourts){
 const base=Math.floor(n/numCourts),extra=n%numCourts;
 return Array.from({length:numCourts},(_,c)=>base+(c>=numCourts-extra?1:0));
+}
+function sizesValid(sizes){
+return sizes.every(s=>s===4||s===5);
 }
 function buildCourts(ids,numCourts){
 const sorted=[...ids].sort((a,b)=>gp(a).rank-gp(b).rank);
@@ -394,14 +505,14 @@ const sizes=courtSizes(sorted.length,numCourts);
 const courts=[];let idx=0;
 sizes.forEach(size=>{
 const cp=sorted.slice(idx,idx+size);idx+=size;
-courts.push({players:cp,games:roundRobin(cp),maxScore:21});
+courts.push({players:cp,games:buildGames(cp),maxScore:21});
 });
 return courts;
 }
 function startSession(){
 const att=[...setup.attending];
 if(att.length<4){toast('Need at least 4 players');return;}
-if(courtSizes(att.length,setup.numCourts)[0]<2){toast('Reduce court count — each court needs at least 2 players');return;}
+if(!sizesValid(courtSizes(att.length,setup.numCourts))){toast('Doubles needs every court to have exactly 4 or 5 players — adjust attendance or court count');return;}
 const courts=buildCourts(att,setup.numCourts);
 const bands=courts.map(c=>c.players.map(id=>gp(id).rank).sort((a,b)=>a-b));
 S.activeSession={
@@ -451,7 +562,7 @@ r.courts.forEach((c,ci)=>{
 if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:4px;"><strong>Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
-h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+nameOf(g.p1)+' '+g.s1+'–'+g.s2+' '+nameOf(g.p2)+'</div>';
+h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+nameOf(g.sitOut)+')</em>':'')+'</div>';
 });
 });
 h+='</div>';
@@ -482,16 +593,16 @@ court.games.forEach((game,gi)=>{
 const scored=game.s1!==null&&game.s2!==null;
 const w1=scored&&game.s1>game.s2,w2=scored&&game.s2>game.s1;
 h+='<div class="game-card">'
-+'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+'</span>'
++'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+(game.sitOut?' · '+nameOf(game.sitOut)+' sits out':'')+'</span>'
 +(scored
 ?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">edit</button></span>'
 :'<span class="game-status-pending">● Enter score</span>')
 +'</div>'
 +'<div class="game-score-body">'
-+'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.p1)+'</div>'
++'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair1[1])+'</div>'
 +'<div class="score-inputs"><input class="score-input'+(scored?(w1?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-1" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s1!==null?game.s1:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="1"></div></div>'
 +'<div class="vs-col"><span class="vs-text">VS</span>'+(scored?'<span class="vs-score">'+game.s1+'–'+game.s2+'</span>':'')+'</div>'
-+'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.p2)+'</div>'
++'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair2[1])+'</div>'
 +'<div class="score-inputs"><input class="score-input'+(scored?(w2?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-2" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s2!==null?game.s2:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="2"></div></div>'
 +'</div></div>';
 });
@@ -590,15 +701,15 @@ pid=Number(pid);
 const name=nameOf(pid);
 const court=S.activeSession.courts[ci];
 court.players=court.players.filter(id=>id!==pid);
-court.games=court.games.filter(g=>g.p1!==pid&&g.p2!==pid);
-if(court.players.length>=2){
-court.games=roundRobin(court.players);
-} else {
-court.games=[];
-}
 S.activeSession.attending=S.activeSession.attending.filter(id=>id!==pid);
 pendingRemoveSession=null;
+if(court.players.length===4||court.players.length===5){
+court.games=buildGames(court.players);
 save();renderSession();toast(name+' removed from session');
+}else{
+court.games=[];
+save();renderSession();toast(name+' removed — Court '+(Number(ci)+1)+' now has too few players for doubles');
+}
 }
 
 // ── Per-round computation (shared by advanceRound and finaliseSession) ─
@@ -607,9 +718,9 @@ const ptMap={},winMap={};
 court.players.forEach(id=>{ptMap[id]=0;winMap[id]=0;});
 court.games.forEach(g=>{
 if(g.s1!==null&&g.s2!==null){
-ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
-ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
-if(g.s1>g.s2)winMap[g.p1]++;else winMap[g.p2]++;
+g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
+g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
+if(g.s1>g.s2)g.pair1.forEach(id=>winMap[id]++);else g.pair2.forEach(id=>winMap[id]++);
 }
 });
 const ranked=[...court.players].sort((a,b)=>{
@@ -625,15 +736,14 @@ function accumulateStats(court){
 const ptMap={};court.players.forEach(id=>ptMap[id]=0);
 court.games.forEach(g=>{
 if(g.s1!==null&&g.s2!==null){
-ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
-ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
-const p1=gp(g.p1),p2=gp(g.p2);
+g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
+g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
 if(g.s1>g.s2){
-if(p1){p1.wins++;p1.sessions++;}
-if(p2){p2.losses++;p2.sessions++;}
+g.pair1.forEach(id=>{const p=gp(id);if(p){p.wins++;p.sessions++;}});
+g.pair2.forEach(id=>{const p=gp(id);if(p){p.losses++;p.sessions++;}});
 } else {
-if(p2){p2.wins++;p2.sessions++;}
-if(p1){p1.losses++;p1.sessions++;}
+g.pair2.forEach(id=>{const p=gp(id);if(p){p.wins++;p.sessions++;}});
+g.pair1.forEach(id=>{const p=gp(id);if(p){p.losses++;p.sessions++;}});
 }
 }
 });
@@ -671,7 +781,7 @@ if(ci!==undefined)buckets[ci].push(id);
 });
 return buckets.map((ids,ci)=>{
 const sorted=[...ids].sort((a,b)=>virtualRanks[a]-virtualRanks[b]);
-return{players:sorted,games:roundRobin(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21};
+return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21};
 });
 }
 
@@ -716,6 +826,40 @@ function cancelSession(){
 S.activeSession=null;save();showTab('ladder');toast('Session cancelled');
 }
 
+// ── Settings ──────────────────────────────────────────────────────────
+function renderSettings(){
+const root=el('tab-settings');
+const dotColor=syncStatus.state==='synced'?'var(--green)':syncStatus.state==='error'?'var(--red)':syncStatus.state==='syncing'?'var(--yellow)':'var(--muted)';
+let h='<div class="card" style="margin-bottom:14px;">'
++'<div class="section-label" style="margin-bottom:8px;">Google Sheet Backend</div>'
++'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">Paste the <strong>Apps Script Web App URL</strong> you get after deploying the backend script (not the raw Sheet link). Leave blank to keep using local browser storage only.</div>'
++'<input class="add-input" id="backend-url-input" placeholder="https://script.google.com/macros/s/…/exec" value="'+(BACKEND_URL||'')+'" style="margin-bottom:10px;">'
++'<div class="btn-row" style="margin-top:0;">'
++'<button class="btn btn-primary" id="save-url-btn">Save URL</button>'
++'<button class="btn btn-outline" id="sync-now-btn"'+(BACKEND_URL&&CREDS?'':' disabled')+'>Sync Now</button>'
++'<button class="btn btn-outline" id="pull-now-btn"'+(BACKEND_URL&&CREDS?'':' disabled')+'>Pull from Sheet</button>'
++'</div>'
++'<div style="font-size:12px;margin-top:10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+dotColor+';"></span><span style="color:var(--muted);">'+(BACKEND_URL?(CREDS?(syncStatus.msg||'Not synced yet'):'Not signed in'):'Not connected — using local storage only')+'</span></div>'
++(BACKEND_URL&&CREDS?'<div class="btn-row"><button class="btn btn-outline" id="logout-btn">Log out</button></div>':'')
++'</div>';
+root.innerHTML=h;
+el('save-url-btn').addEventListener('click',()=>{
+const url=el('backend-url-input').value.trim();
+BACKEND_URL=url;
+localStorage.setItem(BACKEND_KEY,url);
+toast(url?'Backend URL saved':'Backend URL cleared');
+if(url&&!CREDS)showLoginGate();
+else if(url)pullFromBackend(true);
+renderSettings();
+});
+el('sync-now-btn').addEventListener('click',()=>{clearTimeout(syncTimer);pushToBackend();});
+el('pull-now-btn').addEventListener('click',()=>{
+if(confirm('This will overwrite local data with whatever is in the Google Sheet. Continue?'))pullFromBackend(true);
+});
+const lo=el('logout-btn');
+if(lo)lo.addEventListener('click',logout);
+}
+
 // ── History ───────────────────────────────────────────────────────────
 function renderHistory(){
 const root=el('tab-history');
@@ -731,7 +875,7 @@ if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--green)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
-h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+nameOf(g.p1)+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+nameOf(g.p2)+'</div>';
+h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+nameOf(g.sitOut)+')</em>':'')+'</div>';
 });
 });
 });
@@ -746,6 +890,8 @@ root.innerHTML=h;
 }
 
 render();
+if(BACKEND_URL&&!CREDS)showLoginGate();
+else if(BACKEND_URL)pullFromBackend(false);
 </script>
 </body>
 </html>
