@@ -21,8 +21,8 @@ header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space
 .logo-text{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--green);}
 .logo-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
 .session-btn{background:var(--green);color:var(--court);border:none;padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
-.tabs{display:flex;gap:3px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:20px;}
-.tab{flex:1;padding:8px 4px;border:none;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;border-radius:7px;cursor:pointer;text-align:center;}
+.tabs{display:flex;gap:3px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:20px;overflow-x:auto;}
+.tab{flex:1 0 auto;padding:8px 10px;border:none;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;border-radius:7px;cursor:pointer;text-align:center;white-space:nowrap;}
 .tab.active{background:var(--court-line);color:var(--green);}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;position:relative;overflow:hidden;}
 .card-accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border);}
@@ -679,11 +679,17 @@ const v2=el('s-'+ci+'-'+gi+'-2')?.value;
 if(v1===''||v2===''||v1===undefined||v2===undefined)return;
 const s1=parseInt(v1),s2=parseInt(v2);
 if(isNaN(s1)||isNaN(s2))return;
-S.activeSession.courts[ci].games[gi].s1=s1;
-S.activeSession.courts[ci].games[gi].s2=s2;
+const game=S.activeSession.courts[ci].games[gi];
+const wasScored=game.s1!==null&&game.s2!==null;
+game.s1=s1;
+game.s2=s2;
 save();
-const ms=S.activeSession.courts[ci].maxScore||21;
-if(s1===ms||s2===ms){renderSession();}
+if(!wasScored){
+const focusedId=inp.id,selStart=inp.selectionStart,selEnd=inp.selectionEnd;
+renderSession();
+const refocus=el(focusedId);
+if(refocus){refocus.focus();try{refocus.setSelectionRange(selStart,selEnd);}catch(err){}}
+}
 });
 });
 
@@ -847,10 +853,11 @@ el('save-url-btn').addEventListener('click',()=>{
 const url=el('backend-url-input').value.trim();
 BACKEND_URL=url;
 localStorage.setItem(BACKEND_KEY,url);
+CREDS=null;
+localStorage.removeItem(AUTH_KEY);
 toast(url?'Backend URL saved':'Backend URL cleared');
-if(url&&!CREDS)showLoginGate();
-else if(url)pullFromBackend(true);
 renderSettings();
+if(url)showLoginGate();
 });
 el('sync-now-btn').addEventListener('click',()=>{clearTimeout(syncTimer);pushToBackend();});
 el('pull-now-btn').addEventListener('click',()=>{
@@ -889,9 +896,12 @@ h+='</div>';
 root.innerHTML=h;
 }
 
+if(BACKEND_URL&&!CREDS){
+showLoginGate();
+}else{
 render();
-if(BACKEND_URL&&!CREDS)showLoginGate();
-else if(BACKEND_URL)pullFromBackend(false);
+if(BACKEND_URL)pullFromBackend(false);
+}
 </script>
 </body>
 </html>
