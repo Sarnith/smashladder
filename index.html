@@ -321,11 +321,11 @@ save();renderPlayers();toast(target.name+' moved to #'+newRank);
 }
 
 // ── Session setup ─────────────────────────────────────────────────────
-let setup={attending:new Set(),numCourts:2};
+let setup={attending:new Set(),numCourts:2,numRounds:2};
 function openSessionModal(){
 if(S.activeSession){toast('Finish the active session first');showTab('session');return;}
 if(S.players.length<4){toast('Add at least 4 players first');return;}
-setup={attending:new Set(),numCourts:2};
+setup={attending:new Set(),numCourts:2,numRounds:2};
 buildModal();
 }
 function buildModal(){
@@ -390,6 +390,7 @@ return courts;
 function startSession(){
 const att=[...setup.attending];
 if(att.length<4){toast('Need at least 4 players');return;}
+if(courtSizes(att.length,setup.numCourts)[0]<2){toast('Reduce court count — each court needs at least 2 players');return;}
 S.activeSession={
 date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
 courts:buildCourts(att,setup.numCourts),
@@ -428,8 +429,8 @@ s.courts.forEach((court,ci)=>{
 const ptMap={};court.players.forEach(id=>ptMap[id]=0);
 court.games.forEach(g=>{
 if(g.s1!==null&&g.s2!==null){
-g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
-g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
+ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
+ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
 }
 });
 const ranked=[...court.players].sort((a,b)=>(ptMap[b]||0)-(ptMap[a]||0));
@@ -461,10 +462,10 @@ h+='<div class="game-card">'
 :'<span class="game-status-pending">● Enter score</span>')
 +'</div>'
 +'<div class="game-score-body">'
-+'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair1[1])+'</div>'
++'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.p1)+'</div>'
 +'<div class="score-inputs"><input class="score-input'+(scored?(w1?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-1" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s1!==null?game.s1:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="1"></div></div>'
 +'<div class="vs-col"><span class="vs-text">VS</span>'+(scored?'<span class="vs-score">'+game.s1+'–'+game.s2+'</span>':'')+'</div>'
-+'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair2[1])+'</div>'
++'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.p2)+'</div>'
 +'<div class="score-inputs"><input class="score-input'+(scored?(w2?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-2" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s2!==null?game.s2:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="2"></div></div>'
 +'</div></div>';
 });
@@ -558,10 +559,9 @@ pid=Number(pid);
 const name=nameOf(pid);
 const court=S.activeSession.courts[ci];
 court.players=court.players.filter(id=>id!==pid);
-court.games=court.games.filter(g=>!g.pair1.includes(pid)&&!g.pair2.includes(pid));
-if(court.players.length>=4){
-const newGames=court.players.length===5?pairings5(court.players):pairings4(court.players.slice(0,4));
-court.games=newGames;
+court.games=court.games.filter(g=>g.p1!==pid&&g.p2!==pid);
+if(court.players.length>=2){
+court.games=roundRobin(court.players);
 } else {
 court.games=[];
 }
@@ -580,14 +580,15 @@ const courtTallies=s.courts.map(court=>{
 const ptMap={};court.players.forEach(id=>ptMap[id]=0);
 court.games.forEach(g=>{
 if(g.s1!==null&&g.s2!==null){
-g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
-g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
+ptMap[g.p1]=(ptMap[g.p1]||0)+g.s1;
+ptMap[g.p2]=(ptMap[g.p2]||0)+g.s2;
+const p1=gp(g.p1),p2=gp(g.p2);
 if(g.s1>g.s2){
-g.pair1.forEach(id=>{const p=gp(id);if(p){p.wins++;p.sessions++;}});
-g.pair2.forEach(id=>{const p=gp(id);if(p){p.losses++;p.sessions++;}});
+if(p1){p1.wins++;p1.sessions++;}
+if(p2){p2.losses++;p2.sessions++;}
 } else {
-g.pair2.forEach(id=>{const p=gp(id);if(p){p.wins++;p.sessions++;}});
-g.pair1.forEach(id=>{const p=gp(id);if(p){p.losses++;p.sessions++;}});
+if(p2){p2.wins++;p2.sessions++;}
+if(p1){p1.losses++;p1.sessions++;}
 }
 }
 });
@@ -648,7 +649,7 @@ if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--green)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
-h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+'</div>';
+h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+nameOf(g.p1)+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+nameOf(g.p2)+'</div>';
 });
 });
 if(s.skipped&&s.skipped.length)h+='<div style="font-size:11px;color:var(--red);margin-top:6px;">Skipped: '+s.skipped.map(id=>nameOf(id)).join(', ')+'</div>';
