@@ -180,7 +180,7 @@ function def(){return{players:[],nextId:1,sessions:[],activeSession:null};}
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||def();}catch{return def();}}
 let S=load();
 const CLOUD=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
-let SB=null,USER=null,CAN_EDIT=true,channel=null;
+let SB=null,USER=null,CAN_EDIT=true,channel=null,TOKEN='';
 let syncTimer=null,reloadTimer=null,pushing=false,lastPushAt=0,saveSeq=0,syncedSigs={};
 let syncStatus={state:'idle',msg:''}; // idle|syncing|synced|error
 
@@ -201,6 +201,23 @@ if(o&&typeof o==='object')return'{'+Object.keys(o).sort().map(k=>JSON.stringify(
 return JSON.stringify(o===undefined?null:o);
 }
 function ensureSessionIds(){S.sessions.forEach((s,i)=>{if(!s.id)s.id='s'+Date.now().toString(36)+'-'+i;});}
+// Last-chance save when the tab is hidden or closed. A normal request would be cancelled with the
+// page, so this uses fetch({keepalive:true}) straight to the same push_state function.
+function flushOnHide(){
+if(!CLOUD||!CAN_EDIT||!TOKEN||!localStorage.getItem(DIRTY_KEY))return;
+clearTimeout(syncTimer);
+const seq=saveSeq;
+const{sigs,payload}=buildPayload();
+const body=JSON.stringify({p:payload});
+if(body.length>60000){pushToBackend();return;} // keepalive requests are capped at ~64 KB
+lastPushAt=Date.now();
+try{
+fetch(SUPABASE_URL+'/rest/v1/rpc/push_state',{method:'POST',keepalive:true,
+headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+TOKEN},body})
+.then(r=>{if(r.ok){syncedSigs=sigs;if(seq===saveSeq)localStorage.removeItem(DIRTY_KEY);}})
+.catch(()=>{});
+}catch(e){}
+}
 function setSync(state,msg){
 syncStatus={state,msg};
 const b=document.getElementById('live-badge');
@@ -303,25 +320,32 @@ else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')setSyn
 async function startApp(){
 const{data:{session}}=await SB.auth.getSession();
 if(!session){showLoginGate();return;}
-USER=session.user;
+USER=session.user;TOKEN=session.access_token;
 const{data:isScorer,error}=await SB.rpc('is_scorer');
 CAN_EDIT=!error&&isScorer===true;
 document.body.classList.toggle('viewer',!CAN_EDIT);
 if(!CAN_EDIT&&currentTab==='players')showTab('ladder');
 if(!CAN_EDIT)localStorage.removeItem(DIRTY_KEY);
 
-// Changes made on this device that never reached the cloud (e.g. you were offline)
+// Changes made on this device that may not have reached the cloud (offline, or closed too fast)
+let loaded=false;
 if(CAN_EDIT&&localStorage.getItem(DIRTY_KEY)){
-if(confirm('This device has changes that never reached the cloud.\n\nOK = upload them (overwrites the cloud version)\nCancel = discard them and load the cloud version')){
+const local=S;
+try{await loadAll();loaded=true;}catch(e){}
+const view=o=>stable({players:[...o.players].sort((a,b)=>a.id-b.id),sessions:o.sessions,activeSession:o.activeSession});
+if(!loaded){S=local;scheduleSync();}                       // offline: keep local work, keep retrying
+else if(view(S)===view(local)){localStorage.removeItem(DIRTY_KEY);} // it did arrive after all
+else if(confirm('This device has changes that never reached the cloud.\n\nOK = upload them (overwrites the cloud version)\nCancel = discard them and load the cloud version')){
+S=local;syncedSigs={};localStorage.setItem(KEY,JSON.stringify(S));
 await pushToBackend();
 }else{
 localStorage.removeItem(DIRTY_KEY);
 }
 }
-if(!localStorage.getItem(DIRTY_KEY)){
+if(!loaded&&!localStorage.getItem(DIRTY_KEY)){
 try{await loadAll();setSync('synced','Live');}
 catch(e){setSync('error','Load failed: '+e.message);}
-}
+}else if(loaded){setSync('synced','Live');}
 render();
 subscribeRealtime();
 }
@@ -1046,6 +1070,7 @@ h+='<div class="card"><div class="section-label" style="margin-bottom:8px;">Back
 if(CAN_EDIT){
 h+='<div id="import-card" style="margin-top:14px;"><div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.6;">Restore or migrate: paste a backup JSON to <strong>replace all current data</strong> (players, history, active session).</div>'
 +'<textarea id="import-json" rows="4" style="width:100%;background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:\'Space Mono\',monospace;font-size:11px;outline:none;resize:vertical;" placeholder=\'{"players":[…],"sessions":[…],…}\'></textarea>'
++'<div style="margin-top:8px;font-size:12px;color:var(--muted);">…or choose a backup file: <input type="file" id="import-file" accept=".json,application/json" style="font-size:12px;color:var(--muted);"></div>'
 +'<div class="btn-row"><button class="btn btn-danger" id="import-btn">Replace data with this JSON</button></div></div>';
 }
 h+='</div>';
@@ -1064,6 +1089,13 @@ const a=document.createElement('a');
 a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
 a.download='smash-ladder-backup-'+new Date().toISOString().slice(0,10)+'.json';
 a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+const pick=el('import-file');
+if(pick)pick.addEventListener('change',()=>{
+const f=pick.files[0];if(!f)return;
+const r=new FileReader();
+r.onload=()=>{el('import-json').value=r.result;toast('File loaded — check it, then press Replace');};
+r.readAsText(f);
 });
 on('import-btn',()=>{
 let d;try{d=JSON.parse(el('import-json').value);}catch(e){toast('That is not valid JSON');return;}
@@ -1151,10 +1183,15 @@ el('del-sess-no').addEventListener('click',()=>{pendingDeleteSession=false;rende
 if(CLOUD){
 el('tab-ladder').innerHTML='<div class="empty">Loading…</div>';
 SB=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')setTimeout(onSignedOut,0);});
-document.addEventListener('visibilitychange',()=>{
-if(!document.hidden&&USER&&!(CAN_EDIT&&localStorage.getItem(DIRTY_KEY)))refreshFromCloud();
+SB.auth.onAuthStateChange((ev,session)=>{
+if(session)TOKEN=session.access_token; // kept fresh for flushOnHide()
+if(ev==='SIGNED_OUT'){TOKEN='';setTimeout(onSignedOut,0);}
 });
+document.addEventListener('visibilitychange',()=>{
+if(document.hidden){flushOnHide();return;}
+if(USER&&!(CAN_EDIT&&localStorage.getItem(DIRTY_KEY)))refreshFromCloud();
+});
+window.addEventListener('pagehide',flushOnHide);
 startApp();
 }else{
 render();
