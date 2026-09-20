@@ -881,11 +881,16 @@ s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
 s.attending.forEach(id=>{const p=gp(id);if(p&&virtual[id]!==undefined)p.rank=virtual[id];});
 
-// Skip penalty
-s.skipped.forEach(id=>{const p=gp(id);if(p)p.rank=Math.min(p.rank+2,S.players.length);});
-
-// Normalise
-[...S.players].sort((a,b)=>a.rank-b.rank).forEach((p,i)=>p.rank=i+1);
+// Skip penalty: each absentee drops 2 places in the overall order; everyone else closes the gap.
+// Bottom-most absentee moves first so the moves don't disturb each other.
+const order=[...S.players].sort((a,b)=>a.rank-b.rank);
+const absent=order.filter(p=>s.skipped.includes(p.id));
+for(let i=absent.length-1;i>=0;i--){
+const idx=order.indexOf(absent[i]);
+order.splice(idx,1);
+order.splice(Math.min(idx+2,order.length),0,absent[i]);
+}
+order.forEach((p,i)=>p.rank=i+1);
 
 const rankChanges=[];
 const ranksAfter={};
