@@ -56,6 +56,10 @@ outline:none;cursor:pointer;flex-shrink:0;
 .confirm-banner-btns{display:flex;gap:7px;flex-shrink:0;}
 .cbtn-yes{background:var(--red);color:#fff;border:none;padding:5px 12px;border-radius:5px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
 .cbtn-no{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:5px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+/* Neutral variant of the confirm banner (removing an unstarted round) */
+.confirm-banner.neutral{background:var(--court-mid);border-color:var(--border);}
+.confirm-banner.neutral .confirm-banner-msg{color:var(--text);}
+.confirm-banner.neutral .cbtn-yes{background:var(--green);color:var(--court);}
 /* Session */
 .session-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
 .session-title{font-size:15px;font-weight:700;margin-bottom:4px;}
@@ -259,6 +263,7 @@ if(BACKEND_URL)showLoginGate();
 // pending remove state
 let pendingRemovePlayer=null; // player id
 let pendingRemoveSession=null; // {ci, pid}
+let pendingRemoveRound=false; // confirm banner for "Remove Round N"
 
 // ── Tabs ──────────────────────────────────────────────────────────────
 let currentTab='ladder';
@@ -274,6 +279,7 @@ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.datas
 document.getElementById('tab-'+x).style.display=x===t?'':'none');
 pendingRemovePlayer=null;
 pendingRemoveSession=null;
+pendingRemoveRound=false;
 render();
 }
 function render(){
@@ -554,6 +560,21 @@ h+='<div class="confirm-banner"><span class="confirm-banner-msg">Remove <strong>
 +'<div class="confirm-banner-btns"><button class="cbtn-yes" id="sess-confirm-yes">Remove</button><button class="cbtn-no" id="sess-confirm-no">Cancel</button></div></div>';
 }
 
+// Pending "remove round" banner
+if(pendingRemoveRound&&s.numRounds>1){
+const inProgress=s.numRounds===s.round; // removing the round currently on the courts
+if(!inProgress){
+h+='<div class="confirm-banner neutral"><span class="confirm-banner-msg">Remove <strong>Round '+s.numRounds+'</strong>? It hasn\'t started yet — the session will finish after Round '+(s.numRounds-1)+'.</span>'
++'<div class="confirm-banner-btns"><button class="cbtn-yes" id="round-confirm-yes">Remove</button><button class="cbtn-no" id="round-confirm-no">Cancel</button></div></div>';
+}else{
+const msg=doneG>0
+?'⚠ <strong>Round '+s.round+'</strong> is in progress ('+doneG+' of '+totalG+' games scored). Removing it will <strong>discard those scores</strong> and reopen Round '+(s.round-1)+' as the final round (its scores are kept).'
+:'<strong>Round '+s.round+'</strong> has no scores yet. Removing it will reopen Round '+(s.round-1)+' as the final round.';
+h+='<div class="confirm-banner"><span class="confirm-banner-msg">'+msg+'</span>'
++'<div class="confirm-banner-btns"><button class="cbtn-yes" id="round-confirm-yes">'+(doneG>0?'Discard &amp; Remove':'Remove')+'</button><button class="cbtn-no" id="round-confirm-no">Cancel</button></div></div>';
+}
+}
+
 if(s.rounds.length){
 h+='<div class="section-label" style="margin-top:4px;">Previous Rounds</div>';
 s.rounds.forEach((r,ri)=>{
@@ -633,6 +654,7 @@ const btnLabel=isLastRound?'Finalise &amp; Update Rankings':'Complete Round '+s.
 const btnId=isLastRound?'finalise-btn':'advance-round-btn';
 h+='<div class="btn-row">'
 +'<button class="btn btn-primary" id="'+btnId+'"'+(allDone?'':' disabled')+'>'+btnLabel+'</button>'
++(s.numRounds>1?'<button class="btn btn-outline" id="remove-round-btn">Remove Round '+s.numRounds+'</button>':'')
 +'<button class="btn btn-danger" id="cancel-session-btn">Cancel Session</button>'
 +'</div>'
 +'<div style="font-size:12px;color:'+(allDone?'var(--green)':'var(--muted)')+';margin-top:8px;">'
@@ -645,6 +667,13 @@ root.innerHTML=h;
 if(pendingRemoveSession!==null){
 el('sess-confirm-yes').addEventListener('click',()=>doRemoveFromSession(pendingRemoveSession.ci,pendingRemoveSession.pid));
 el('sess-confirm-no').addEventListener('click',()=>{pendingRemoveSession=null;renderSession();});
+}
+
+const rrb=el('remove-round-btn');
+if(rrb)rrb.addEventListener('click',()=>{pendingRemoveRound=true;renderSession();});
+if(el('round-confirm-yes')){
+el('round-confirm-yes').addEventListener('click',removeLastRound);
+el('round-confirm-no').addEventListener('click',()=>{pendingRemoveRound=false;renderSession();});
 }
 
 root.querySelectorAll('.pill-remove').forEach(btn=>{
@@ -755,6 +784,25 @@ g.pair1.forEach(id=>{const p=gp(id);if(p){p.losses++;p.sessions++;}});
 });
 court.players.forEach(id=>{const p=gp(id);if(p)p.totalPts=(p.totalPts||0)+(ptMap[id]||0);});
 }
+// Exact inverse of accumulateStats — used when reopening an already-advanced round
+function unaccumulateStats(court){
+const ptMap={};court.players.forEach(id=>ptMap[id]=0);
+const dec=(id,field)=>{const p=gp(id);if(p){p[field]=Math.max(0,(p[field]||0)-1);p.sessions=Math.max(0,(p.sessions||0)-1);}};
+court.games.forEach(g=>{
+if(g.s1!==null&&g.s2!==null){
+g.pair1.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s1);
+g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
+if(g.s1>g.s2){
+g.pair1.forEach(id=>dec(id,'wins'));
+g.pair2.forEach(id=>dec(id,'losses'));
+} else {
+g.pair2.forEach(id=>dec(id,'wins'));
+g.pair1.forEach(id=>dec(id,'losses'));
+}
+}
+});
+court.players.forEach(id=>{const p=gp(id);if(p)p.totalPts=Math.max(0,(p.totalPts||0)-(ptMap[id]||0));});
+}
 function computeRoundVirtualRanks(courts,bands,rankBasis){
 const tallies=courts.map(c=>tallyCourt(c,rankBasis));
 const virtual={};
@@ -800,6 +848,28 @@ s.rounds.push({courts:s.courts});
 s.courts=regroupForNextRound(s,virtual);
 s.round+=1;
 save();renderSession();toast('Round '+(s.round-1)+' complete — Round '+s.round+' started! 🏸');
+}
+
+// ── Remove the last round of the session ────────────────────────────────
+// Case 1: last round hasn't been reached yet  -> just lower numRounds.
+// Case 2: last round is the one on the courts -> discard its scores, reopen the previous
+//         round as the final one (undoing the stats that advanceRound() already booked).
+function removeLastRound(){
+const s=S.activeSession;
+if(!s||s.numRounds<=1){pendingRemoveRound=false;renderSession();return;}
+const removed=s.numRounds;
+if(s.numRounds>s.round){
+s.numRounds--;
+}else{
+const prev=s.rounds.pop();
+if(!prev){pendingRemoveRound=false;renderSession();return;}
+prev.courts.forEach(unaccumulateStats);
+s.courts=prev.courts;
+s.round--;
+s.numRounds--;
+}
+pendingRemoveRound=false;
+save();renderSession();toast('Round '+removed+' removed');
 }
 
 // ── Finalise ──────────────────────────────────────────────────────────
