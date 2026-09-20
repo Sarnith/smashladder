@@ -264,6 +264,7 @@ if(BACKEND_URL)showLoginGate();
 let pendingRemovePlayer=null; // player id
 let pendingRemoveSession=null; // {ci, pid}
 let pendingRemoveRound=false; // confirm banner for "Remove Round N"
+let pendingDeleteSession=false; // confirm banner for deleting the latest history session
 
 // ── Tabs ──────────────────────────────────────────────────────────────
 let currentTab='ladder';
@@ -280,6 +281,7 @@ document.getElementById('tab-'+x).style.display=x===t?'':'none');
 pendingRemovePlayer=null;
 pendingRemoveSession=null;
 pendingRemoveRound=false;
+pendingDeleteSession=false;
 render();
 }
 function render(){
@@ -945,13 +947,51 @@ if(lo)lo.addEventListener('click',logout);
 }
 
 // ── History ───────────────────────────────────────────────────────────
+// Has the ladder been edited since this session was finalised? (manual rank edits, players added/removed)
+function ladderDriftedSince(s){
+if(!s.ranksAfter)return false;
+return S.players.length!==Object.keys(s.ranksAfter).length||S.players.some(p=>s.ranksAfter[p.id]!==p.rank);
+}
+// Undo the newest finalised session: stats, ranks and trend arrows go back to before it.
+function deleteLatestSession(){
+const s=S.sessions[S.sessions.length-1];
+if(!s){pendingDeleteSession=false;return;}
+const rounds=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
+rounds.forEach(r=>(r.courts||[]).forEach(unaccumulateStats));
+if(s.ranksAfter&&s.rankChanges){
+const deltaByName={};s.rankChanges.forEach(r=>deltaByName[r.name]=r.delta);
+S.players.forEach(p=>{
+if(s.ranksAfter[p.id]!==undefined)p.rank=s.ranksAfter[p.id]+(deltaByName[p.name]||0);
+});
+[...S.players].sort((a,b)=>a.rank-b.rank).forEach((p,i)=>p.rank=i+1);
+}
+// Trend arrows revert to whatever the previous session showed
+const prev=S.sessions[S.sessions.length-2];
+const prevDelta={};
+if(prev&&prev.rankChanges)prev.rankChanges.forEach(r=>prevDelta[r.name]=r.delta);
+S.players.forEach(p=>p.rankDelta=prevDelta[p.name]||0);
+S.sessions.pop();
+pendingDeleteSession=false;
+save();render();toast(s.date+' session deleted');
+}
+
 function renderHistory(){
 const root=el('tab-history');
 if(!S.sessions.length){root.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No sessions yet.</div>';return;}
 let h='';
-[...S.sessions].reverse().forEach(s=>{
+if(pendingDeleteSession){
+const ls=S.sessions[S.sessions.length-1];
+const note=!ls.ranksAfter?' This session has no saved rank snapshot, so only wins/losses/points are reverted — ranks stay as they are.'
+:ladderDriftedSince(ls)?' ⚠ The ladder has changed since (ranks edited or players added/removed), so restored ranks may not be exact.'
+:' Rankings go back to how they were before it.';
+h+='<div class="confirm-banner"><span class="confirm-banner-msg">Delete the <strong>'+ls.date+'</strong> session? Its wins, losses and points are removed.'+note+'</span>'
++'<div class="confirm-banner-btns"><button class="cbtn-yes" id="del-sess-yes">Delete</button><button class="cbtn-no" id="del-sess-no">Cancel</button></div></div>';
+}
+[...S.sessions].reverse().forEach((s,idx)=>{
 const roundsArr=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
-h+='<div class="history-card"><div class="history-date">'+s.date+' · '+roundsArr.length+' round'+(roundsArr.length>1?'s':'')+' · '+roundsArr[0].courts.length+' courts · '+s.attending.length+' players</div>';
+h+='<div class="history-card"'+(idx===0&&pendingDeleteSession?' style="border-color:var(--red);"':'')+'>'
++(idx===0?'<button class="btn btn-danger" id="del-latest-btn" style="float:right;padding:4px 10px;font-size:11px;">Delete</button>':'')
++'<div class="history-date">'+s.date+' · '+roundsArr.length+' round'+(roundsArr.length>1?'s':'')+' · '+roundsArr[0].courts.length+' courts · '+s.attending.length+' players</div>';
 roundsArr.forEach((r,ri)=>{
 if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--green);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
 r.courts.forEach((c,ci)=>{
@@ -971,6 +1011,11 @@ if(changes.length)h+='<div style="font-size:11px;color:var(--muted);margin-top:6
 h+='</div>';
 });
 root.innerHTML=h;
+el('del-latest-btn').addEventListener('click',()=>{pendingDeleteSession=true;renderHistory();});
+if(pendingDeleteSession){
+el('del-sess-yes').addEventListener('click',deleteLatestSession);
+el('del-sess-no').addEventListener('click',()=>{pendingDeleteSession=false;renderHistory();});
+}
 }
 
 if(BACKEND_URL&&!CREDS){
