@@ -883,16 +883,21 @@ s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
 s.attending.forEach(id=>{const p=gp(id);if(p&&virtual[id]!==undefined)p.rank=virtual[id];});
 
-// Skip penalty: each absentee drops 2 places in the overall order; everyone else closes the gap.
-// Bottom-most absentee moves first so the moves don't disturb each other.
+// Skip penalty: each absentee drops 2 places (never past the bottom, never onto a lower absentee's
+// place); attendees fill every remaining place in their new order, so nobody is left with a gap.
 const order=[...S.players].sort((a,b)=>a.rank-b.rank);
-const absent=order.filter(p=>s.skipped.includes(p.id));
-for(let i=absent.length-1;i>=0;i--){
-const idx=order.indexOf(absent[i]);
-order.splice(idx,1);
-order.splice(Math.min(idx+2,order.length),0,absent[i]);
+const N=order.length;
+const target={}; // old index -> new index, for absentees only
+let limit=N-1;
+for(let i=N-1;i>=0;i--){
+if(s.skipped.includes(order[i].id)){target[i]=Math.min(i+2,limit);limit=target[i]-1;}
 }
-order.forEach((p,i)=>p.rank=i+1);
+const placed=new Array(N);
+Object.keys(target).forEach(i=>placed[target[i]]=order[i]);
+const attendees=order.filter((p,i)=>target[i]===undefined);
+let ai=0;
+for(let k=0;k<N;k++)if(!placed[k])placed[k]=attendees[ai++];
+placed.forEach((p,i)=>p.rank=i+1);
 
 const rankChanges=[];
 const ranksAfter={};
