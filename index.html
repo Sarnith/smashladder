@@ -631,8 +631,16 @@ h+='<div style="background:var(--red-dim);border:1px solid rgba(248,113,113,.3);
 const isLastRound=s.round>=s.numRounds;
 const btnLabel=isLastRound?'Finalise &amp; Update Rankings':'Complete Round '+s.round+' → Start Round '+(s.round+1);
 const btnId=isLastRound?'finalise-btn':'advance-round-btn';
+const minimumRoundLimit=Math.max(1,s.round-1);
+const roundLimitOptions=Array.from({length:s.numRounds-s.round+1},(_,i)=>{
+const n=s.round+i;
+const roundLimitOptions=Array.from({length:s.numRounds-minimumRoundLimit+1},(_,i)=>{
+const n=minimumRoundLimit+i;
+return '<option value="'+n+'"'+(n===s.numRounds?' selected':'')+'>'+n+'</option>';
+}).join('');
 h+='<div class="btn-row">'
 +'<button class="btn btn-primary" id="'+btnId+'"'+(allDone?'':' disabled')+'>'+btnLabel+'</button>'
++(isLastRound?'':'<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">End after round <select class="score-opt" id="round-limit-select">'+roundLimitOptions+'</select></label>')
 +'<button class="btn btn-danger" id="cancel-session-btn">Cancel Session</button>'
 +'</div>'
 +'<div style="font-size:12px;color:'+(allDone?'var(--green)':'var(--muted)')+';margin-top:8px;">'
@@ -697,6 +705,8 @@ const fb=el('finalise-btn');
 if(fb)fb.addEventListener('click',finaliseSession);
 const ab=el('advance-round-btn');
 if(ab)ab.addEventListener('click',advanceRound);
+const rls=el('round-limit-select');
+if(rls)rls.addEventListener('change',()=>setSessionRoundLimit(Number(rls.value)));
 const cb=el('cancel-session-btn');
 if(cb)cb.addEventListener('click',cancelSession);
 }
@@ -809,6 +819,14 @@ const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
 
 s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
+s.rounds.push({courts:s.courts});
+delete s.courts;
+commitFinalisedSession(s,virtual);
+toast('Rankings updated! 🏆');
+}
+
+function commitFinalisedSession(s,virtual){
+const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
 s.attending.forEach(id=>{const p=gp(id);if(p&&virtual[id]!==undefined)p.rank=virtual[id];});
 
 // Skip penalty
@@ -828,6 +846,35 @@ s.ranksAfter=ranksAfter;
 S.sessions.push({...s});
 S.activeSession=null;
 save();showTab('ladder');toast('Rankings updated! 🏆');
+save();showTab('ladder');
+}
+
+// Future rounds are generated only when advancing, so reducing numRounds
+// safely removes only unstarted rounds and retains every entered score.
+function setSessionRoundLimit(roundLimit){
+const s=S.activeSession;
+if(!s||roundLimit<s.round||roundLimit>=s.numRounds)return;
+if(!s||roundLimit<1||roundLimit>=s.numRounds)return;
+if(roundLimit===s.round-1){
+const scored=s.courts.reduce((total,c)=>total+c.games.filter(g=>g.s1!==null&&g.s2!==null).length,0);
+const message='Round '+s.round+' has already started. Ending after Round '+roundLimit+' will discard this round and its '+scored+' entered score'+(scored===1?'':'s')+'. The session will then be finalised using Round '+roundLimit+'. Continue?';
+if(!confirm(message)){renderSession();return;}
+const completedRound=s.rounds[roundLimit-1];
+if(!completedRound){renderSession();return;}
+const virtual=computeRoundVirtualRanks(completedRound.courts,s.bands,s.rankBasis);
+s.rounds=s.rounds.slice(0,roundLimit);
+s.round=roundLimit;
+s.numRounds=roundLimit;
+delete s.courts;
+commitFinalisedSession(s,virtual);
+toast('Round '+(roundLimit+1)+' discarded — rankings finalised after Round '+roundLimit);
+return;
+}
+if(roundLimit<s.round)return;
+const removed=s.numRounds-roundLimit;
+s.numRounds=roundLimit;
+save();renderSession();
+toast('Session will end after Round '+roundLimit+' — '+removed+' future round'+(removed===1?'':'s')+' removed');
 }
 
 function cancelSession(){
