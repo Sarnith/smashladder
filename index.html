@@ -129,6 +129,19 @@ outline:none;cursor:pointer;flex-shrink:0;
 .team-choice-name{font-size:14px;font-weight:700;flex:1;}
 .team-choice-role{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
 .team-choice.current .team-choice-role{color:var(--green);}
+.profile-wrap{position:relative;}
+.profile-popover{position:absolute;top:calc(100% + 9px);right:0;width:310px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:0 18px 42px rgba(0,0,0,.42);z-index:110;}
+.profile-summary{display:flex;align-items:center;gap:10px;padding:7px 7px 13px;}
+.profile-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--green-dim);border:1px solid var(--green);color:var(--green);font-weight:700;font-family:'Space Mono',monospace;}
+.profile-email{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;}
+.profile-role{font-size:10px;color:var(--muted);margin-top:2px;}
+.profile-action{display:flex;width:100%;align-items:center;gap:10px;text-align:left;background:transparent;border:0;border-radius:8px;padding:10px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;}
+.profile-action:hover{background:var(--court-mid);}
+.profile-action-icon{width:20px;text-align:center;}
+.profile-action-label{font-size:13px;font-weight:700;flex:1;}
+.profile-action-meta{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;}
+.profile-divider{height:1px;background:var(--border);margin:7px 3px;}
+.profile-action.danger{color:var(--red);}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:14px;}
 .player-check{background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
 .player-check.attending{border-color:var(--green);background:var(--green-dim);}
@@ -155,7 +168,7 @@ body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 <div class="logo-text">🏸 SMASH LADDER</div>
 <div class="logo-sub"><span id="team-name">Badminton Rankings</span> <span id="live-badge" style="margin-left:6px;letter-spacing:0;"></span></div>
 </div>
-<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="new-session-btn">+ New Session</button><button class="session-btn" id="profile-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">👤 Profile</button></div>
+<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="new-session-btn">+ New Session</button><div class="profile-wrap" id="profile-wrap"><button class="session-btn" id="profile-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">👤 Profile</button></div></div>
 </header>
 <div class="tabs">
 <button class="tab active" data-tab="ladder">🏆 Ladder</button>
@@ -367,20 +380,23 @@ m.querySelectorAll('[data-team-id]').forEach(btn=>btn.addEventListener('click',a
 function showProfileMenu(){
 const old=el('profile-menu');if(old)old.remove();
 const roleLabel=CURRENT_TEAM?.app_role==='platform_admin'?'Platform Admin':CURRENT_TEAM?.app_role==='team_admin'?'Team Admin':CURRENT_TEAM?.app_role==='scorer'?'Scoring User':'Viewer';
-const m=document.createElement('div');m.className='modal-bg';m.id='profile-menu';
-let actions='<button class="team-choice" id="profile-teams"><span class="team-choice-name">Teams</span><span class="team-choice-role">Switch</span></button>';
-if(CURRENT_TEAM?.app_role==='platform_admin')actions+='<button class="team-choice" id="profile-admin"><span class="team-choice-name">Admin</span><span class="team-choice-role">Platform</span></button>';
-if(CAN_EDIT)actions+='<button class="team-choice" id="profile-settings"><span class="team-choice-name">Settings</span><span class="team-choice-role">Team</span></button>';
-actions+='<button class="team-choice" id="profile-logout"><span class="team-choice-name">Log out</span><span class="team-choice-role">Account</span></button>';
-m.innerHTML='<div class="modal" style="max-width:380px;"><button class="modal-close" id="profile-close" aria-label="Close">✕</button><div class="modal-title">Profile</div><div class="modal-sub">Signed in as <strong style="color:var(--text);">'+esc(USER?.email||'—')+'</strong> · '+roleLabel+'</div>'+actions+'</div>';
-document.body.appendChild(m);
-const close=()=>m.remove();
-el('profile-close').addEventListener('click',close);
+const m=document.createElement('div');m.className='profile-popover';m.id='profile-menu';
+const action=(id,icon,label,meta,extra='')=>'<button class="profile-action '+extra+'" id="'+id+'"><span class="profile-action-icon">'+icon+'</span><span class="profile-action-label">'+label+'</span><span class="profile-action-meta">'+meta+'</span></button>';
+let actions=action('profile-teams','🏸','Teams','Switch');
+if(CURRENT_TEAM?.app_role==='platform_admin')actions+=action('profile-admin','🛡️','Admin','Platform');
+if(CAN_EDIT)actions+=action('profile-settings','⚙️','Settings','Team');
+actions+='<div class="profile-divider"></div>'+action('profile-logout','↪','Log out','Account','danger');
+const email=USER?.email||'—';
+m.innerHTML='<div class="profile-summary"><div class="profile-avatar">'+esc(email.charAt(0).toUpperCase())+'</div><div><div class="profile-email">'+esc(email)+'</div><div class="profile-role">'+roleLabel+'</div></div></div><div class="profile-divider"></div>'+actions;
+el('profile-wrap').appendChild(m);
+let onOutside;
+const close=()=>{m.remove();if(onOutside)document.removeEventListener('click',onOutside);};
 el('profile-teams').addEventListener('click',()=>{close();showTeamSwitcher();});
 if(el('profile-admin'))el('profile-admin').addEventListener('click',()=>{close();showTab('admin');});
 if(el('profile-settings'))el('profile-settings').addEventListener('click',()=>{close();showTab('settings');});
 el('profile-logout').addEventListener('click',()=>{close();logout();});
-m.addEventListener('click',e=>{if(e.target===m)close();});
+onOutside=e=>{if(!el('profile-wrap')?.contains(e.target))close();};
+setTimeout(()=>{if(el('profile-menu')===m)document.addEventListener('click',onOutside);},0);
 }
 function showNoTeamGate(msg){
 closeLoginGate();
