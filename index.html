@@ -149,7 +149,7 @@ body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .t
 <div class="logo-text">🏸 SMASH LADDER</div>
 <div class="logo-sub"><span id="team-name">Badminton Rankings</span> <span id="live-badge" style="margin-left:6px;letter-spacing:0;"></span></div>
 </div>
-<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="team-switch-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Teams</button><button class="session-btn" id="new-session-btn">+ New Session</button></div>
+<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="team-switch-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Teams</button><button class="session-btn" id="new-session-btn">+ New Session</button><button class="session-btn" id="header-logout-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Log out</button></div>
 </header>
 <div class="tabs">
 <button class="tab active" data-tab="ladder">🏆 Ladder</button>
@@ -421,6 +421,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
 btn.addEventListener('click',()=>showTab(btn.dataset.tab));
 });
 document.getElementById('new-session-btn').addEventListener('click',openSessionModal);
+document.getElementById('header-logout-btn').addEventListener('click',logout);
 document.getElementById('team-switch-btn').addEventListener('click',()=>{
 if(!TEAMS.length)return;
 const choices=TEAMS.map((t,i)=>(i+1)+'. '+t.team_name+' ('+t.app_role+')').join('\n');
