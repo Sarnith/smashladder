@@ -124,6 +124,11 @@ outline:none;cursor:pointer;flex-shrink:0;
 .modal-title{font-size:17px;font-weight:700;margin-bottom:4px;}
 .modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
 .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-top:-4px;}
+.team-choice{display:flex;width:100%;align-items:center;gap:12px;text-align:left;background:var(--court-mid);border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:8px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:background .15s,border-color .15s;}
+.team-choice:hover,.team-choice.current{background:var(--green-dim);border-color:var(--green);}
+.team-choice-name{font-size:14px;font-weight:700;flex:1;}
+.team-choice-role{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.team-choice.current .team-choice-role{color:var(--green);}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:14px;}
 .player-check{background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
 .player-check.attending{border-color:var(--green);background:var(--green-dim);}
@@ -350,6 +355,17 @@ const next=TEAMS.find(t=>t.team_id===id);if(!next)return;
 localStorage.setItem('smash_current_team',id);CURRENT_TEAM=next;
 await startApp();
 }
+function showTeamSwitcher(){
+if(!TEAMS.length)return;
+const roleLabel=role=>role==='platform_admin'?'Platform Admin':role==='team_admin'?'Team Admin':role==='scorer'?'Scoring User':'Viewer';
+const m=document.createElement('div');m.className='modal-bg';m.id='team-switcher';
+const choices=TEAMS.map(t=>'<button class="team-choice'+(t.team_id===CURRENT_TEAM?.team_id?' current':'')+'" data-team-id="'+t.team_id+'"><span class="team-choice-name">'+esc(t.team_name)+'</span><span class="team-choice-role">'+roleLabel(t.app_role)+(t.team_id===CURRENT_TEAM?.team_id?' · Current':'')+'</span></button>').join('');
+m.innerHTML='<div class="modal"><button class="modal-close" id="team-switcher-close" aria-label="Close">✕</button><div class="modal-title">Choose a team</div><div class="modal-sub">Switch to a team you can access.</div>'+choices+'</div>';
+document.body.appendChild(m);
+el('team-switcher-close').addEventListener('click',()=>m.remove());
+m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+m.querySelectorAll('[data-team-id]').forEach(btn=>btn.addEventListener('click',async()=>{const id=btn.dataset.teamId;m.remove();if(id!==CURRENT_TEAM?.team_id)await switchTeam(id);}));
+}
 function showNoTeamGate(msg){
 closeLoginGate();
 const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
@@ -426,12 +442,7 @@ btn.addEventListener('click',()=>showTab(btn.dataset.tab));
 });
 document.getElementById('new-session-btn').addEventListener('click',openSessionModal);
 document.getElementById('header-logout-btn').addEventListener('click',logout);
-document.getElementById('team-switch-btn').addEventListener('click',()=>{
-if(!TEAMS.length)return;
-const choices=TEAMS.map((t,i)=>(i+1)+'. '+t.team_name+' ('+t.app_role+')').join('\n');
-const answer=prompt('Choose a team:\n'+choices, String(TEAMS.findIndex(t=>t.team_id===CURRENT_TEAM?.team_id)+1));
-const index=Number(answer)-1;if(Number.isInteger(index)&&TEAMS[index])switchTeam(TEAMS[index].team_id);
-});
+document.getElementById('team-switch-btn').addEventListener('click',showTeamSwitcher);
 
 function showTab(t){
 currentTab=t;
