@@ -1104,7 +1104,9 @@ if(canCreateAdmin)el('create-team-btn').addEventListener('click',async()=>{
 const teamName=el('new-team-name').value.trim(),email=el('new-team-admin-email').value.trim(),password=el('new-team-admin-password').value;
 if(!teamName||!email){el('create-team-result').textContent='Enter a team name and Team Admin email.';return;}
 const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'create_team',teamName,email,role:'team_admin',password:password||undefined,generatePassword:!password}});
-const out=el('create-team-result');out.style.color=error||data?.error?'var(--red)':'var(--green)';out.textContent=error||data?.error||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
+let functionError=error?.message||data?.error;
+if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}
+const out=el('create-team-result');out.style.color=functionError?'var(--red)':'var(--green)';out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
 if(!error&&!data?.error){await startApp();}
 });
 el('member-player').addEventListener('change',()=>{const p=gp(el('member-player').value);if(p?.email)el('member-email').value=p.email;});

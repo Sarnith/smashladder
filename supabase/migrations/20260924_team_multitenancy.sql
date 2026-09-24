@@ -220,8 +220,10 @@ begin
   if exists (select 1 from public.teams where id = p_team_id and viewer_passcode_hash is not null) and not p_rotate then
     return null;
   end if;
-  v_code := upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 12));
-  update public.teams set viewer_passcode_hash = crypt(v_code, gen_salt('bf')), viewer_passcode_created_at = now(), updated_at = now() where id = p_team_id;
+  -- gen_random_uuid() is available on Supabase even when pgcrypto's byte
+  -- helpers are installed in a non-public schema.
+  v_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
+  update public.teams set viewer_passcode_hash = extensions.crypt(v_code, extensions.gen_salt('bf')), viewer_passcode_created_at = now(), updated_at = now() where id = p_team_id;
   insert into public.team_audit_log(team_id, actor_id, event) values (p_team_id, auth.uid(), case when p_rotate then 'viewer_passcode_rotated' else 'viewer_passcode_created' end);
   return v_code;
 end $$;
@@ -232,7 +234,7 @@ returns uuid language plpgsql security definer set search_path = public as $$
 declare v_team_id uuid;
 begin
   if auth.uid() is null then raise exception 'Sign-in session required'; end if;
-  select id into v_team_id from public.teams where name_key = lower(btrim(p_team_name)) and viewer_passcode_hash = crypt(p_passcode, viewer_passcode_hash);
+  select id into v_team_id from public.teams where name_key = lower(btrim(p_team_name)) and viewer_passcode_hash = extensions.crypt(p_passcode, viewer_passcode_hash);
   if v_team_id is null then raise exception 'Invalid team name or passcode'; end if;
   insert into public.viewer_access(team_id, user_id, entered_email) values (v_team_id, auth.uid(), lower(btrim(p_email)))
   on conflict (team_id, user_id) do update set entered_email = excluded.entered_email, granted_at = now();
