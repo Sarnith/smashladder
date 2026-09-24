@@ -756,7 +756,7 @@ if(setup.splitMode!=='custom'){box.innerHTML='';return;}
 const c=setup.numCourts;
 const auto=courtSizes(setup.attending.size,c);
 setup.customSizes=Array.from({length:c},(_,i)=>setup.customSizes[i]!==undefined?setup.customSizes[i]:Math.min(5,Math.max(4,auto[i]||4)));
-box.innerHTML=setup.customSizes.map((v,i)=>'<div><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Court '+(i+1)+'</div><input type="number" class="add-input" data-csize="'+i+'" style="max-width:70px;" min="4" max="5" value="'+v+'"></div>').join('');
+box.innerHTML=setup.customSizes.map((v,i)=>'<div><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Court '+(i+1)+'</div><input type="number" class="add-input" data-csize="'+i+'" style="max-width:70px;" min="4" max="7" value="'+v+'"></div>').join('');
 box.querySelectorAll('[data-csize]').forEach(inp=>{
 inp.addEventListener('input',()=>{
 setup.customSizes[Number(inp.dataset.csize)]=parseInt(inp.value)||0;
@@ -773,7 +773,7 @@ if(sizes.length<1)return'Need at least 1 court.';
 if(setup.splitMode==='custom'){
 const sum=sizes.reduce((a,b)=>a+b,0);
 if(sum!==n)return'Court sizes add up to '+sum+' but '+n+' player'+(n===1?' is':'s are')+' selected.';
-if(!sizesValid(sizes))return'Doubles needs every court to have exactly 4 or 5 players — got '+sizes.join(', ')+'.';
+if(!sizesValid(sizes,7))return'Custom courts need 4 to 7 players each — got '+sizes.join(', ')+'.';
 return null;
 }
 if(!sizesValid(sizes))return'Doubles needs every court to have exactly 4 or 5 players — got '+sizes.join(', ')+'. Adjust attendance or court count, or use a Custom split.';
@@ -785,7 +785,7 @@ const pv=el('modal-preview');if(!pv)return;
 const sizes=sessionSizes();
 const err=sizesError(n,sizes);
 if(err){pv.textContent=err;return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g===5?' (1 sits out each game)':'')).join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
@@ -808,7 +808,37 @@ return[
 {pair1:[b,c],pair2:[d,e],sitOut:a,s1:null,s2:null}
 ];
 }
+// 6 and 7: every player plays 4 games, no partner repeats, opponents balanced
+function pairings6(ids){
+const[a,b,c,d,e,f]=ids;
+return[
+{pair1:[b,e],pair2:[c,f],sitOut:[a,d],s1:null,s2:null},
+{pair1:[a,e],pair2:[b,d],sitOut:[c,f],s1:null,s2:null},
+{pair1:[a,c],pair2:[e,f],sitOut:[b,d],s1:null,s2:null},
+{pair1:[a,d],pair2:[b,c],sitOut:[e,f],s1:null,s2:null},
+{pair1:[b,f],pair2:[d,e],sitOut:[a,c],s1:null,s2:null},
+{pair1:[a,f],pair2:[c,d],sitOut:[b,e],s1:null,s2:null}
+];
+}
+function pairings7(ids){
+const[a,b,c,d,e,f,g]=ids;
+return[
+{pair1:[a,f],pair2:[b,c],sitOut:[d,e,g],s1:null,s2:null},
+{pair1:[b,e],pair2:[d,f],sitOut:[a,c,g],s1:null,s2:null},
+{pair1:[b,d],pair2:[e,g],sitOut:[a,c,f],s1:null,s2:null},
+{pair1:[a,c],pair2:[d,e],sitOut:[b,f,g],s1:null,s2:null},
+{pair1:[b,f],pair2:[c,g],sitOut:[a,d,e],s1:null,s2:null},
+{pair1:[a,g],pair2:[c,e],sitOut:[b,d,f],s1:null,s2:null},
+{pair1:[a,d],pair2:[f,g],sitOut:[b,c,e],s1:null,s2:null}
+];
+}
+function sitOutNames(g){
+if(!g.sitOut)return'';
+return(Array.isArray(g.sitOut)?g.sitOut:[g.sitOut]).map(id=>nameOf(id)).join(', ');
+}
 function buildGames(ids){
+if(ids.length===7)return pairings7(ids);
+if(ids.length===6)return pairings6(ids);
 if(ids.length===5)return pairings5(ids);
 if(ids.length===4)return pairings4(ids);
 return[];
@@ -817,8 +847,8 @@ function courtSizes(n,numCourts){
 const base=Math.floor(n/numCourts),extra=n%numCourts;
 return Array.from({length:numCourts},(_,c)=>base+(c>=numCourts-extra?1:0));
 }
-function sizesValid(sizes){
-return sizes.every(s=>s===4||s===5);
+function sizesValid(sizes,max=5){
+return sizes.every(s=>s>=4&&s<=max);
 }
 function buildCourts(ids,sizes){
 const sorted=[...ids].sort((a,b)=>gp(a).rank-gp(b).rank);
@@ -898,7 +928,7 @@ r.courts.forEach((c,ci)=>{
 if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:4px;"><strong>Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
-h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+nameOf(g.sitOut)+')</em>':'')+'</div>';
+h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
 });
 });
 h+='</div>';
@@ -929,7 +959,7 @@ court.games.forEach((game,gi)=>{
 const scored=game.s1!==null&&game.s2!==null;
 const w1=scored&&game.s1>game.s2,w2=scored&&game.s2>game.s1;
 h+='<div class="game-card">'
-+'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+(game.sitOut?' · '+nameOf(game.sitOut)+' sits out':'')+'</span>'
++'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+(game.sitOut?' · '+sitOutNames(game)+' sit'+(Array.isArray(game.sitOut)&&game.sitOut.length>1?'':'s')+' out':'')+'</span>'
 +(scored
 ?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">edit</button></span>'
 :'<span class="game-status-pending">● Enter score</span>')
@@ -1062,7 +1092,7 @@ const court=S.activeSession.courts[ci];
 court.players=court.players.filter(id=>id!==pid);
 S.activeSession.attending=S.activeSession.attending.filter(id=>id!==pid);
 pendingRemoveSession=null;
-if(court.players.length===4||court.players.length===5){
+if(court.players.length>=4&&court.players.length<=7){
 court.games=buildGames(court.players);
 save();renderSession();toast(name+' removed from session');
 }else{
@@ -1492,7 +1522,7 @@ if(ci>0)h+='<hr class="div">';
 h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--green)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
-h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+nameOf(g.sitOut)+')</em>':'')+'</div>';
+h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
 });
 });
 });
