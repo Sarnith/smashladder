@@ -142,6 +142,11 @@ outline:none;cursor:pointer;flex-shrink:0;
 .profile-action-meta{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;}
 .profile-divider{height:1px;background:var(--border);margin:7px 3px;}
 .profile-action.danger{color:var(--red);}
+.profile-team-option{display:flex;width:100%;align-items:center;gap:9px;text-align:left;background:transparent;border:1px solid transparent;border-radius:8px;padding:10px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;}
+.profile-team-option:hover,.profile-team-option.current{background:var(--court-mid);border-color:var(--border);}
+.profile-team-option.current{border-color:var(--green);}
+.profile-team-name{font-size:13px;font-weight:700;flex:1;}
+.profile-team-role{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:14px;}
 .player-check{background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
 .player-check.attending{border-color:var(--green);background:var(--green-dim);}
@@ -391,12 +396,21 @@ m.innerHTML='<div class="profile-summary"><div class="profile-avatar">'+esc(emai
 el('profile-wrap').appendChild(m);
 let onOutside;
 const close=()=>{m.remove();if(onOutside)document.removeEventListener('click',onOutside);};
-el('profile-teams').addEventListener('click',()=>{close();showTeamSwitcher();});
+m.closeProfilePopover=close;
+el('profile-teams').addEventListener('click',()=>showTeamsInProfile(m));
 if(el('profile-admin'))el('profile-admin').addEventListener('click',()=>{close();showTab('admin');});
 if(el('profile-settings'))el('profile-settings').addEventListener('click',()=>{close();showTab('settings');});
 el('profile-logout').addEventListener('click',()=>{close();logout();});
 onOutside=e=>{if(!el('profile-wrap')?.contains(e.target))close();};
 setTimeout(()=>{if(el('profile-menu')===m)document.addEventListener('click',onOutside);},0);
+}
+function showTeamsInProfile(m){
+if(!m||!TEAMS.length)return;
+const roleLabel=role=>role==='platform_admin'?'Platform Admin':role==='team_admin'?'Team Admin':role==='scorer'?'Scoring User':'Viewer';
+const choices=TEAMS.map(t=>'<button class="profile-team-option'+(t.team_id===CURRENT_TEAM?.team_id?' current':'')+'" data-profile-team-id="'+t.team_id+'"><span class="profile-team-name">'+esc(t.team_name)+'</span><span class="profile-team-role">'+roleLabel(t.app_role)+(t.team_id===CURRENT_TEAM?.team_id?' · Current':'')+'</span></button>').join('');
+m.innerHTML='<button class="profile-action" id="profile-back"><span class="profile-action-icon">←</span><span class="profile-action-label">Choose a team</span></button><div class="profile-divider"></div>'+choices;
+el('profile-back').addEventListener('click',()=>{m.closeProfilePopover?.();showProfileMenu();});
+m.querySelectorAll('[data-profile-team-id]').forEach(btn=>btn.addEventListener('click',async()=>{const id=btn.dataset.profileTeamId;m.closeProfilePopover?.();if(id!==CURRENT_TEAM?.team_id)await switchTeam(id);}));
 }
 function showNoTeamGate(msg){
 closeLoginGate();
