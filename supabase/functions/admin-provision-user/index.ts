@@ -77,9 +77,8 @@ Deno.serve(async (request) => {
     if (profileError) throw new Error(profileError.message);
 
     if (body.playerId !== undefined) {
-      const { error: playerError } = await admin.from('team_players')
-        .update({ auth_user_id: created.user.id, email })
-        .eq('team_id', teamId).eq('player_id', body.playerId);
+      const playerUpdate = admin.from('team_players').update({ auth_user_id: created.user.id, email });
+      const { error: playerError } = await playerUpdate.eq('team_id', teamId).eq('player_id', body.playerId);
       if (playerError) throw new Error(playerError.message);
     }
     await admin.from('team_audit_log').insert({

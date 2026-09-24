@@ -211,7 +211,7 @@ if(!CLOUD||!CAN_EDIT||!TOKEN||!localStorage.getItem(DIRTY_KEY))return;
 clearTimeout(syncTimer);
 const seq=saveSeq;
 const{sigs,payload}=buildPayload();
-const body=JSON.stringify({p_team_id:CURRENT_TEAM.id,p:payload});
+const body=JSON.stringify({p_team_id:CURRENT_TEAM.team_id,p:payload});
 if(body.length>60000){pushToBackend();return;} // keepalive requests are capped at ~64 KB
 lastPushAt=Date.now();
 try{
@@ -250,7 +250,7 @@ pushing=true;setSync('syncing','Saving…');
 const seq=saveSeq;
 const{sigs,payload}=buildPayload();
 let error=null;
-try{({error}=await SB.rpc('push_team_state',{p_team_id:CURRENT_TEAM.id,p:payload}));}catch(e){error=e;}
+try{({error}=await SB.rpc('push_team_state',{p_team_id:CURRENT_TEAM.team_id,p:payload}));}catch(e){error=e;}
 pushing=false;lastPushAt=Date.now();
 if(error){
 setSync('error','Save failed: '+(error.message||error)+' — retrying');
@@ -263,7 +263,7 @@ setSync('synced','Saved '+new Date().toLocaleTimeString());
 }
 async function loadAll(){
 if(!CURRENT_TEAM)throw new Error('Choose a team first');
-const{data,error}=await SB.rpc('load_team_state',{p_team_id:CURRENT_TEAM.id});
+const{data,error}=await SB.rpc('load_team_state',{p_team_id:CURRENT_TEAM.team_id});
 if(error||!data)throw new Error(error?error.message:'You do not have access to this team');
 S=data;
 localStorage.setItem(KEY,JSON.stringify(S));
@@ -870,7 +870,7 @@ if(v1===''||v2===''||v1===undefined||v2===undefined)return;
 const s1=parseInt(v1),s2=parseInt(v2);
 if(isNaN(s1)||isNaN(s2))return;
 if(!CAN_EDIT&&CAN_SCORE){
-const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.id,p_court_index:ci,p_game_index:gi,p_score_1:s1,p_score_2:s2});
+const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_score_1:s1,p_score_2:s2});
 if(error){toast('Score not saved: '+error.message);return;}
 await refreshFromCloud();return;
 }
@@ -1085,7 +1085,7 @@ async function renderMembers(){
 const root=el('tab-members');
 if(!CURRENT_TEAM||!CAN_EDIT){root.innerHTML='';return;}
 root.innerHTML='<div class="empty">Loading members…</div>';
-const{data:members,error}=await SB.from('team_members').select('user_id,role,granted_at').eq('team_id',CURRENT_TEAM.id).order('granted_at');
+const{data:members,error}=await SB.from('team_members').select('user_id,role,granted_at').eq('team_id',CURRENT_TEAM.team_id).order('granted_at');
 if(error){root.innerHTML='<div class="empty">Could not load members: '+esc(error.message)+'</div>';return;}
 const ids=(members||[]).map(m=>m.user_id);
 const{data:profiles}=ids.length?await SB.from('user_profiles').select('user_id,email').in('user_id',ids):{data:[]};
@@ -1098,7 +1098,7 @@ h+='<div class="card"><div class="section-label">Create account / promote player
 h+='<div class="section-label">Accounts</div>';
 (members||[]).forEach(m=>{h+='<div class="card"><div class="player-row"><div class="rank-num">'+(m.role==='team_admin'?'★':'✎')+'</div><div><div class="player-name">'+esc(emailById[m.user_id]||m.user_id)+'</div><div class="player-stats">'+(m.role==='team_admin'?'Team Admin':'Scoring User')+'</div></div></div></div>';});
 root.innerHTML=h;
-const showPasscode=async rotate=>{const{data,error}=await SB.rpc('create_or_rotate_viewer_passcode',{p_team_id:CURRENT_TEAM.id,p_rotate:rotate});el('passcode-result').textContent=error?error.message:(data?'Passcode: '+data:'A passcode already exists. Rotate it to create a new one.');};
+const showPasscode=async rotate=>{const{data,error}=await SB.rpc('create_or_rotate_viewer_passcode',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});el('passcode-result').textContent=error?error.message:(data?'Passcode: '+data:'A passcode already exists. Rotate it to create a new one.');};
 el('passcode-btn').addEventListener('click',()=>showPasscode(false));el('rotate-passcode-btn').addEventListener('click',()=>showPasscode(true));
 if(canCreateAdmin)el('create-team-btn').addEventListener('click',async()=>{
 const teamName=el('new-team-name').value.trim(),email=el('new-team-admin-email').value.trim(),password=el('new-team-admin-password').value;
@@ -1112,7 +1112,7 @@ el('create-member-btn').addEventListener('click',async()=>{
 const email=el('member-email').value.trim(),password=el('member-password').value;
 if(!email){el('member-result').textContent='Enter an email address.';return;}
 const playerId=el('member-player').value||undefined;
-const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{teamId:CURRENT_TEAM.id,email,role:el('member-role').value,playerId:Number(playerId)||undefined,password:password||undefined,generatePassword:!password}});
+const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{teamId:CURRENT_TEAM.team_id,email,role:el('member-role').value,playerId:Number(playerId)||undefined,password:password||undefined,generatePassword:!password}});
 el('member-result').style.color=error||data?.error?'var(--red)':'var(--green)';
 el('member-result').textContent=error||data?.error||(data.temporaryPassword?'Account created. Temporary password: '+data.temporaryPassword:'Account created.');
 if(!error&&!data?.error)renderMembers();
