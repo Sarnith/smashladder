@@ -155,7 +155,7 @@ body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 <div class="logo-text">🏸 SMASH LADDER</div>
 <div class="logo-sub"><span id="team-name">Badminton Rankings</span> <span id="live-badge" style="margin-left:6px;letter-spacing:0;"></span></div>
 </div>
-<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="team-switch-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Teams</button><button class="session-btn" id="new-session-btn">+ New Session</button><button class="session-btn" id="header-logout-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Log out</button></div>
+<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="new-session-btn">+ New Session</button><button class="session-btn" id="profile-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">👤 Profile</button></div>
 </header>
 <div class="tabs">
 <button class="tab active" data-tab="ladder">🏆 Ladder</button>
@@ -163,8 +163,6 @@ body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 <button class="tab" data-tab="history">📋 History</button>
 <button class="tab" data-tab="players">👤 Players</button>
 <button class="tab" data-tab="members">👥 Members</button>
-<button class="tab" data-tab="admin">🛡️ Admin</button>
-<button class="tab" data-tab="settings">⚙️ Settings</button>
 </div>
 <div id="tab-ladder"></div>
 <div id="tab-session" style="display:none"></div>
@@ -366,6 +364,24 @@ el('team-switcher-close').addEventListener('click',()=>m.remove());
 m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 m.querySelectorAll('[data-team-id]').forEach(btn=>btn.addEventListener('click',async()=>{const id=btn.dataset.teamId;m.remove();if(id!==CURRENT_TEAM?.team_id)await switchTeam(id);}));
 }
+function showProfileMenu(){
+const old=el('profile-menu');if(old)old.remove();
+const roleLabel=CURRENT_TEAM?.app_role==='platform_admin'?'Platform Admin':CURRENT_TEAM?.app_role==='team_admin'?'Team Admin':CURRENT_TEAM?.app_role==='scorer'?'Scoring User':'Viewer';
+const m=document.createElement('div');m.className='modal-bg';m.id='profile-menu';
+let actions='<button class="team-choice" id="profile-teams"><span class="team-choice-name">Teams</span><span class="team-choice-role">Switch</span></button>';
+if(CURRENT_TEAM?.app_role==='platform_admin')actions+='<button class="team-choice" id="profile-admin"><span class="team-choice-name">Admin</span><span class="team-choice-role">Platform</span></button>';
+if(CAN_EDIT)actions+='<button class="team-choice" id="profile-settings"><span class="team-choice-name">Settings</span><span class="team-choice-role">Team</span></button>';
+actions+='<button class="team-choice" id="profile-logout"><span class="team-choice-name">Log out</span><span class="team-choice-role">Account</span></button>';
+m.innerHTML='<div class="modal" style="max-width:380px;"><button class="modal-close" id="profile-close" aria-label="Close">✕</button><div class="modal-title">Profile</div><div class="modal-sub">Signed in as <strong style="color:var(--text);">'+esc(USER?.email||'—')+'</strong> · '+roleLabel+'</div>'+actions+'</div>';
+document.body.appendChild(m);
+const close=()=>m.remove();
+el('profile-close').addEventListener('click',close);
+el('profile-teams').addEventListener('click',()=>{close();showTeamSwitcher();});
+if(el('profile-admin'))el('profile-admin').addEventListener('click',()=>{close();showTab('admin');});
+if(el('profile-settings'))el('profile-settings').addEventListener('click',()=>{close();showTab('settings');});
+el('profile-logout').addEventListener('click',()=>{close();logout();});
+m.addEventListener('click',e=>{if(e.target===m)close();});
+}
 function showNoTeamGate(msg){
 closeLoginGate();
 const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
@@ -441,8 +457,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
 btn.addEventListener('click',()=>showTab(btn.dataset.tab));
 });
 document.getElementById('new-session-btn').addEventListener('click',openSessionModal);
-document.getElementById('header-logout-btn').addEventListener('click',logout);
-document.getElementById('team-switch-btn').addEventListener('click',showTeamSwitcher);
+document.getElementById('profile-btn').addEventListener('click',showProfileMenu);
 
 function showTab(t){
 currentTab=t;
