@@ -8,7 +8,9 @@ const corsHeaders = {
 };
 
 type RequestBody = {
+  action?: 'provision_user' | 'create_team';
   teamId: string;
+  teamName?: string;
   email: string;
   role: 'team_admin' | 'scorer';
   playerId?: number;
@@ -37,8 +39,11 @@ Deno.serve(async (request) => {
   try {
     const body = await request.json() as RequestBody;
     const email = body.email?.trim().toLowerCase();
-    if (!body.teamId || !email || !['team_admin', 'scorer'].includes(body.role)) throw new Error('teamId, email and a valid role are required');
-    if (body.role === 'team_admin') {
+    const isCreateTeam = body.action === 'create_team';
+    if (!email || !['team_admin', 'scorer'].includes(body.role)) throw new Error('Email and a valid role are required');
+    if (isCreateTeam && (!body.teamName?.trim() || body.role !== 'team_admin')) throw new Error('A team name and Team Admin are required');
+    if (!isCreateTeam && !body.teamId) throw new Error('teamId is required');
+    if (body.role === 'team_admin' || isCreateTeam) {
       const { data: allowed } = await admin.rpc('is_platform_admin_for', { p_user_id: actorResult.user.id });
       if (allowed !== true) return Response.json({ error: 'Only a Platform Admin can appoint a Team Admin' }, { status: 403, headers: corsHeaders });
     } else {
@@ -56,8 +61,16 @@ Deno.serve(async (request) => {
     });
     if (createError || !created.user) throw new Error(createError?.message || 'Could not create the account');
 
+    let teamId = body.teamId;
+    if (isCreateTeam) {
+      const { data: team, error: teamError } = await admin.from('teams').insert({ name: body.teamName!.trim(), created_by: actorResult.user.id }).select('id').single();
+      if (teamError || !team) throw new Error(teamError?.message || 'Could not create the team');
+      teamId = team.id;
+      const { error: metaError } = await admin.from('team_meta').insert({ team_id: teamId, next_id: 1 });
+      if (metaError) throw new Error(metaError.message);
+    }
     const { error: memberError } = await admin.from('team_members').insert({
-      team_id: body.teamId, user_id: created.user.id, role: body.role, granted_by: actorResult.user.id,
+      team_id: teamId, user_id: created.user.id, role: body.role, granted_by: actorResult.user.id,
     });
     if (memberError) throw new Error(memberError.message);
     const { error: profileError } = await admin.from('user_profiles').upsert({ user_id: created.user.id, email });
@@ -66,14 +79,14 @@ Deno.serve(async (request) => {
     if (body.playerId !== undefined) {
       const { error: playerError } = await admin.from('team_players')
         .update({ auth_user_id: created.user.id, email })
-        .eq('team_id', body.teamId).eq('player_id', body.playerId);
+        .eq('team_id', teamId).eq('player_id', body.playerId);
       if (playerError) throw new Error(playerError.message);
     }
     await admin.from('team_audit_log').insert({
-      team_id: body.teamId, actor_id: actorResult.user.id, event: 'account_provisioned',
+      team_id: teamId, actor_id: actorResult.user.id, event: isCreateTeam ? 'team_created_with_admin' : 'account_provisioned',
       details: { role: body.role, email, player_id: body.playerId ?? null },
     });
-    return Response.json({ userId: created.user.id, temporaryPassword: body.generatePassword ? temporaryPassword : undefined }, { headers: corsHeaders });
+    return Response.json({ teamId, userId: created.user.id, temporaryPassword: body.generatePassword ? temporaryPassword : undefined }, { headers: corsHeaders });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Unable to provision account' }, { status: 400, headers: corsHeaders });
   }
