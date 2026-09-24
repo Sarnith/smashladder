@@ -8,14 +8,15 @@ const corsHeaders = {
 };
 
 type RequestBody = {
-  action?: 'provision_user' | 'create_team';
-  teamId: string;
+  action?: 'provision_user' | 'create_team' | 'manage_team';
+  teamId?: string;
   teamName?: string;
-  email: string;
-  role: 'team_admin' | 'scorer';
+  email?: string;
+  role?: 'team_admin' | 'scorer';
   playerId?: number;
   password?: string;
   generatePassword?: boolean;
+  teamAdminUserId?: string;
 };
 
 function generatedPassword() {
@@ -40,7 +41,54 @@ Deno.serve(async (request) => {
     const body = await request.json() as RequestBody;
     const email = body.email?.trim().toLowerCase();
     const isCreateTeam = body.action === 'create_team';
-    if (!email || !['team_admin', 'scorer'].includes(body.role)) throw new Error('Email and a valid role are required');
+    const isManageTeam = body.action === 'manage_team';
+
+    if (isManageTeam) {
+      if (!body.teamId) throw new Error('teamId is required');
+      const { data: allowed } = await admin.rpc('is_platform_admin_for', { p_user_id: actorResult.user.id });
+      if (allowed !== true) return Response.json({ error: 'Only a Platform Admin can manage teams' }, { status: 403, headers: corsHeaders });
+
+      if (body.teamName !== undefined) {
+        const teamName = body.teamName.trim();
+        if (!teamName) throw new Error('Team name is required');
+        const { error: teamError } = await admin.from('teams').update({ name: teamName }).eq('id', body.teamId);
+        if (teamError) throw new Error(teamError.message);
+      }
+
+      if (body.teamAdminUserId) {
+        const { data: membership, error: membershipError } = await admin
+          .from('team_members')
+          .select('user_id')
+          .eq('team_id', body.teamId)
+          .eq('user_id', body.teamAdminUserId)
+          .eq('role', 'team_admin')
+          .maybeSingle();
+        if (membershipError || !membership) throw new Error('That user is not a Team Admin for this team');
+        const accountUpdate: { email?: string; password?: string; email_confirm?: boolean } = {};
+        if (email) { accountUpdate.email = email; accountUpdate.email_confirm = true; }
+        if (body.password) {
+          if (body.password.length < 8) throw new Error('Temporary passwords must contain at least 8 characters');
+          accountUpdate.password = body.password;
+        }
+        if (!Object.keys(accountUpdate).length) throw new Error('Enter a new email address or password');
+        const { error: accountError } = await admin.auth.admin.updateUserById(body.teamAdminUserId, accountUpdate);
+        if (accountError) throw new Error(accountError.message);
+        if (email) {
+          const { error: profileError } = await admin.from('user_profiles').upsert({ user_id: body.teamAdminUserId, email });
+          if (profileError) throw new Error(profileError.message);
+        }
+      }
+
+      await admin.from('team_audit_log').insert({
+        team_id: body.teamId,
+        actor_id: actorResult.user.id,
+        event: body.teamAdminUserId ? 'team_admin_account_updated' : 'team_renamed',
+        details: { team_name_changed: body.teamName !== undefined, team_admin_user_id: body.teamAdminUserId ?? null, email_changed: Boolean(email), password_changed: Boolean(body.password) },
+      });
+      return Response.json({ ok: true }, { headers: corsHeaders });
+    }
+
+    if (!email || !body.role || !['team_admin', 'scorer'].includes(body.role)) throw new Error('Email and a valid role are required');
     if (isCreateTeam && (!body.teamName?.trim() || body.role !== 'team_admin')) throw new Error('A team name and Team Admin are required');
     if (!isCreateTeam && !body.teamId) throw new Error('teamId is required');
     if (body.role === 'team_admin' || isCreateTeam) {
@@ -61,7 +109,7 @@ Deno.serve(async (request) => {
     });
     if (createError || !created.user) throw new Error(createError?.message || 'Could not create the account');
 
-    let teamId = body.teamId;
+    let teamId = body.teamId!;
     if (isCreateTeam) {
       const { data: team, error: teamError } = await admin.from('teams').insert({ name: body.teamName!.trim(), created_by: actorResult.user.id }).select('id').single();
       if (teamError || !team) throw new Error(teamError?.message || 'Could not create the team');

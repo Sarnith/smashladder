@@ -1190,11 +1190,32 @@ if(!error&&!data?.error)renderMembers();
 });
 }
 
-function renderAdmin(){
+async function renderAdmin(){
 const root=el('tab-admin');
 if(CURRENT_TEAM?.app_role!=='platform_admin'){root.innerHTML='';return;}
-root.innerHTML='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
+root.innerHTML='<div class="empty">Loading teams…</div>';
+const {data:teams,error:teamsError}=await SB.from('teams').select('id,name').order('name');
+if(teamsError){root.innerHTML='<div class="empty">Could not load teams: '+esc(teamsError.message)+'</div>';return;}
+const {data:members,error:membersError}=await SB.from('team_members').select('team_id,user_id,role').eq('role','team_admin');
+if(membersError){root.innerHTML='<div class="empty">Could not load Team Admins: '+esc(membersError.message)+'</div>';return;}
+const adminIds=[...new Set((members||[]).map(m=>m.user_id))];
+const {data:profiles}=adminIds.length?await SB.from('user_profiles').select('user_id,email').in('user_id',adminIds):{data:[]};
+const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
+let h='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
+h+='<div class="section-label" style="margin-top:18px;">Manage teams</div>';
+(teams||[]).forEach(team=>{
+  const admins=(members||[]).filter(m=>m.team_id===team.id);
+  h+='<div class="card"><div class="section-label">Team</div><div class="add-form"><input class="add-input" id="team-name-'+team.id+'" value="'+esc(team.name)+'"><button class="btn btn-outline" data-rename-team="'+team.id+'">Save name</button></div><div class="section-label" style="margin-top:14px;">Team Admins</div>';
+  if(!admins.length)h+='<div style="font-size:12px;color:var(--red);">No Team Admin assigned.</div>';
+  admins.forEach(admin=>{
+    h+='<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px;"><div class="add-form" style="margin-bottom:8px;"><input class="add-input" id="team-admin-email-'+team.id+'-'+admin.user_id+'" type="email" value="'+esc(emailById[admin.user_id]||'')+'" data-original-email="'+esc(emailById[admin.user_id]||'')+'"><input class="add-input" id="team-admin-password-'+team.id+'-'+admin.user_id+'" type="password" minlength="8" placeholder="New password (optional)"></div><button class="btn btn-outline" data-save-team-admin="'+team.id+'" data-admin-user-id="'+admin.user_id+'">Save Team Admin</button><div id="team-admin-result-'+team.id+'-'+admin.user_id+'" style="font-size:12px;margin-top:8px;"></div></div>';
+  });
+  h+='</div>';
+});
+root.innerHTML=h;
 el('create-team-btn').addEventListener('click',createTeam);
+root.querySelectorAll('[data-rename-team]').forEach(btn=>btn.addEventListener('click',()=>saveTeamName(btn.dataset.renameTeam)));
+root.querySelectorAll('[data-save-team-admin]').forEach(btn=>btn.addEventListener('click',()=>saveTeamAdmin(btn.dataset.saveTeamAdmin,btn.dataset.adminUserId)));
 }
 
 async function createTeam(){
@@ -1208,6 +1229,32 @@ if(error?.context){try{const detail=await error.context.clone().json();functionE
 out.style.color=functionError?'var(--red)':'var(--green)';
 out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
 if(!error&&!data?.error){await startApp();}
+}
+
+async function manageTeam(payload){
+const {data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'manage_team',...payload}});
+let message=error?.message||data?.error;
+if(error?.context){try{const detail=await error.context.clone().json();message=detail.error||message;}catch(e){}}
+return message;
+}
+async function saveTeamName(teamId){
+const name=el('team-name-'+teamId).value.trim();
+if(!name){toast('Enter a team name.');return;}
+const error=await manageTeam({teamId,teamName:name});
+if(error){toast('Could not save team: '+error);return;}
+toast('Team name saved.');await startApp();
+}
+async function saveTeamAdmin(teamId,userId){
+const emailInput=el('team-admin-email-'+teamId+'-'+userId);
+const email=emailInput.value.trim(),originalEmail=emailInput.dataset.originalEmail||'';
+const password=el('team-admin-password-'+teamId+'-'+userId).value;
+const result=el('team-admin-result-'+teamId+'-'+userId);
+if(!email){result.style.color='var(--red)';result.textContent='Enter an email address.';return;}
+if(password&&password.length<8){result.style.color='var(--red)';result.textContent='New password must contain at least 8 characters.';return;}
+if(!password&&email===originalEmail){result.style.color='var(--muted)';result.textContent='No changes to save.';return;}
+const error=await manageTeam({teamId,teamAdminUserId:userId,email:email===originalEmail?undefined:email,password:password||undefined});
+result.style.color=error?'var(--red)':'var(--green)';
+result.textContent=error||'Team Admin account updated.';
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
