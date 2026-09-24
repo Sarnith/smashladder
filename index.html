@@ -1140,7 +1140,7 @@ const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
 const canCreateAdmin=CURRENT_TEAM.app_role==='platform_admin';
 let h='<div class="card"><div class="section-label">Team passcode</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Viewers enter <strong>'+esc(CURRENT_TEAM.team_name)+'</strong>, their email, and the shared passcode. It remains available to Team Admins for six hours after it is created or rotated.</div><div class="btn-row"><button class="btn btn-outline" id="passcode-btn">Show passcode</button><button class="btn btn-outline" id="rotate-passcode-btn">Rotate passcode</button></div><div id="passcode-result" style="margin-top:10px;font-family:Space Mono,monospace;color:var(--green);"></div></div>';
 const playerOptions='<option value="">Not linked to a player</option>'+S.players.filter(p=>p.email).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' — '+esc(p.email)+'</option>').join('');
-h+='<div class="card"><div class="section-label">Create account / promote player</div><div class="add-form"><input class="add-input" id="member-email" type="email" placeholder="Email"><select id="member-role" class="add-input" style="max-width:160px;"><option value="scorer">Scoring User</option>'+(canCreateAdmin?'<option value="team_admin">Team Admin</option>':'')+'</select></div><select id="member-player" class="add-input" style="width:100%;margin-bottom:10px;">'+playerOptions+'</select><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="add-input" id="member-password" type="password" placeholder="Temporary password — leave blank to generate"></div><button class="btn btn-primary" id="create-member-btn">Create account</button><div id="member-result" style="font-size:12px;margin-top:10px;color:var(--muted);"></div></div>';
+h+='<div class="card"><div class="section-label">Create account / promote player</div><div class="add-form"><input class="add-input" id="member-email" type="email" placeholder="Email"><select id="member-role" class="add-input" style="max-width:160px;"><option value="scorer">Scoring User</option>'+(canCreateAdmin?'<option value="team_admin">Team Admin</option>':'')+'</select></div><select id="member-player" class="add-input" style="width:100%;margin-bottom:10px;">'+playerOptions+'</select><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="add-input" id="member-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank"></div><button class="btn btn-primary" id="create-member-btn">Create account</button><div id="member-result" style="font-size:12px;margin-top:10px;color:var(--muted);"></div></div>';
 h+='<div class="section-label">Accounts</div>';
 (members||[]).forEach(m=>{h+='<div class="card"><div class="player-row"><div class="rank-num">'+(m.role==='team_admin'?'★':'✎')+'</div><div><div class="player-name">'+esc(emailById[m.user_id]||m.user_id)+'</div><div class="player-stats">'+(m.role==='team_admin'?'Team Admin':'Scoring User')+'</div></div></div></div>';});
 root.innerHTML=h;
@@ -1151,6 +1151,7 @@ el('member-player').addEventListener('change',()=>{const p=gp(el('member-player'
 el('create-member-btn').addEventListener('click',async()=>{
 const email=el('member-email').value.trim(),password=el('member-password').value;
 if(!email){el('member-result').textContent='Enter an email address.';return;}
+if(password&&password.length<8){el('member-result').textContent='Temporary password must contain at least 8 characters.';return;}
 const playerId=el('member-player').value||undefined;
 const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{teamId:CURRENT_TEAM.team_id,email,role:el('member-role').value,playerId:Number(playerId)||undefined,password:password||undefined,generatePassword:!password}});
 el('member-result').style.color=error||data?.error?'var(--red)':'var(--green)';
@@ -1162,7 +1163,7 @@ if(!error&&!data?.error)renderMembers();
 function renderAdmin(){
 const root=el('tab-admin');
 if(CURRENT_TEAM?.app_role!=='platform_admin'){root.innerHTML='';return;}
-root.innerHTML='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" placeholder="Temporary password — leave blank to generate" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
+root.innerHTML='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
 el('create-team-btn').addEventListener('click',createTeam);
 }
 
@@ -1170,6 +1171,7 @@ async function createTeam(){
 const teamName=el('new-team-name').value.trim(),email=el('new-team-admin-email').value.trim(),password=el('new-team-admin-password').value;
 const out=el('create-team-result');
 if(!teamName||!email){out.textContent='Enter a team name and Team Admin email.';return;}
+if(password&&password.length<8){out.textContent='Temporary password must contain at least 8 characters.';return;}
 const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'create_team',teamName,email,role:'team_admin',password:password||undefined,generatePassword:!password}});
 let functionError=error?.message||data?.error;
 if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}

@@ -52,7 +52,7 @@ Deno.serve(async (request) => {
     }
 
     const temporaryPassword = body.generatePassword ? generatedPassword() : body.password;
-    if (!temporaryPassword || temporaryPassword.length < 12) throw new Error('Temporary passwords must contain at least 12 characters');
+    if (!temporaryPassword || temporaryPassword.length < 8) throw new Error('Temporary passwords must contain at least 8 characters');
 
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
