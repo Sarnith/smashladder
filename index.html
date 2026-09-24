@@ -525,8 +525,7 @@ el('bulk-add-btn').addEventListener('click',bulkAddPlayers);
 
 root.querySelectorAll('.remove-btn').forEach(btn=>{
 btn.addEventListener('click',()=>{
-pendingRemovePlayer=Number(btn.dataset.pid);
-renderPlayers();
+showRemovePlayerConfirmation(Number(btn.dataset.pid));
 });
 });
 
@@ -575,6 +574,18 @@ S.players=S.players.filter(x=>x.id!==id);
 S.players.sort((a,b)=>a.rank-b.rank).forEach((x,i)=>x.rank=i+1);
 pendingRemovePlayer=null;
 save();render();toast(name+' removed from ladder');
+}
+
+function showRemovePlayerConfirmation(id){
+const player=gp(id);if(!player)return;
+const m=document.createElement('div');m.className='modal-bg';m.id='remove-player-modal';
+m.innerHTML='<div class="modal"><button class="modal-close" id="remove-player-close" aria-label="Close">✕</button><div class="modal-title">Remove player?</div><div class="modal-sub">⚠️ You are about to remove <strong style="color:var(--text);">'+esc(player.name)+'</strong> from this ladder. This action cannot be undone.</div><div class="btn-row"><button class="btn btn-danger" id="remove-player-confirm">Remove player</button><button class="btn btn-outline" id="remove-player-cancel">Keep player</button></div></div>';
+document.body.appendChild(m);
+const close=()=>m.remove();
+el('remove-player-close').addEventListener('click',close);
+el('remove-player-cancel').addEventListener('click',close);
+el('remove-player-confirm').addEventListener('click',()=>{close();doRemovePlayer(id);});
+m.addEventListener('click',e=>{if(e.target===m)close();});
 }
 
 
