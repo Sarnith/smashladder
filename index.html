@@ -1123,11 +1123,12 @@ if(!error&&!data?.error)renderMembers();
 function renderSettings(){
 const root=el('tab-settings');
 const dot=syncStatus.state==='synced'?'var(--green)':syncStatus.state==='error'?'var(--red)':syncStatus.state==='syncing'?'var(--yellow)':'var(--muted)';
+const roleLabel=CURRENT_TEAM?.app_role==='platform_admin'?'Platform Admin (full access)':CURRENT_TEAM?.app_role==='team_admin'?'Team Admin':CURRENT_TEAM?.app_role==='scorer'?'Scoring User':'Viewer (read-only)';
 let h='<div class="card" style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:8px;">Cloud sync (Supabase)</div>';
 if(!CLOUD){
 h+='<div style="font-size:12px;color:var(--muted);line-height:1.6;">Cloud sync is off. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> at the top of the script (and check the Supabase library loaded). Until then, data is stored in this browser only.</div>';
 }else{
-h+='<div style="font-size:13px;margin-bottom:8px;">Signed in as <strong>'+esc(USER?USER.email:'—')+'</strong> · '+(CAN_EDIT?'Scorer (can edit)':'Viewer (read-only)')+'</div>'
+h+='<div style="font-size:13px;margin-bottom:8px;">Signed in as <strong>'+esc(USER?USER.email:'—')+'</strong> · '+roleLabel+'</div>'
 +'<div style="font-size:12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+dot+';"></span><span style="color:var(--muted);">'+esc(syncStatus.msg||'Connecting…')+'</span></div>'
 +'<div class="btn-row">'
 +(CAN_EDIT?'<button class="btn btn-outline" id="sync-now-btn">Save now</button>':'')
