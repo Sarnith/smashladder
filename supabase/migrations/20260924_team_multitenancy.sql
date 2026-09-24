@@ -103,6 +103,15 @@ create table if not exists public.team_audit_log (
   created_at timestamptz not null default now()
 );
 
+-- Holds a passcode only for the short period in which the Team Admin may
+-- reopen it. It is not readable directly by any client role.
+create table if not exists public.team_passcode_windows (
+  team_id uuid primary key references public.teams(id) on delete cascade,
+  passcode text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists team_members_user_id_idx on public.team_members(user_id);
 create index if not exists viewer_access_user_id_idx on public.viewer_access(user_id);
 create index if not exists team_audit_log_team_created_idx on public.team_audit_log(team_id, created_at desc);
@@ -183,6 +192,7 @@ alter table public.team_active_sessions enable row level security;
 alter table public.team_meta enable row level security;
 alter table public.viewer_access enable row level security;
 alter table public.team_audit_log enable row level security;
+alter table public.team_passcode_windows enable row level security;
 
 create policy "team visible to authorised users" on public.teams for select using (public.can_view_team(id));
 create policy "platform admins manage teams" on public.teams for all using (public.is_platform_admin()) with check (public.is_platform_admin());
@@ -218,12 +228,15 @@ begin
     raise exception 'Only a team admin can manage this team passcode';
   end if;
   if exists (select 1 from public.teams where id = p_team_id and viewer_passcode_hash is not null) and not p_rotate then
-    return null;
+    select passcode into v_code from public.team_passcode_windows where team_id = p_team_id and expires_at > now();
+    return v_code;
   end if;
   -- gen_random_uuid() is available on Supabase even when pgcrypto's byte
   -- helpers are installed in a non-public schema.
   v_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
   update public.teams set viewer_passcode_hash = extensions.crypt(v_code, extensions.gen_salt('bf')), viewer_passcode_created_at = now(), updated_at = now() where id = p_team_id;
+  insert into public.team_passcode_windows(team_id, passcode, expires_at) values (p_team_id, v_code, now() + interval '6 hours')
+  on conflict (team_id) do update set passcode = excluded.passcode, expires_at = excluded.expires_at, created_at = now();
   insert into public.team_audit_log(team_id, actor_id, event) values (p_team_id, auth.uid(), case when p_rotate then 'viewer_passcode_rotated' else 'viewer_passcode_created' end);
   return v_code;
 end $$;
