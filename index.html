@@ -876,8 +876,12 @@ if(v1===''||v2===''||v1===undefined||v2===undefined)return;
 const s1=parseInt(v1),s2=parseInt(v2);
 if(isNaN(s1)||isNaN(s2))return;
 if(!CAN_EDIT&&CAN_SCORE){
-const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_score_1:s1,p_score_2:s2});
-if(error){toast('Score not saved: '+error.message);return;}
+const game=S.activeSession.courts[ci].games[gi];
+const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
+if(error){
+  if(error.message?.startsWith('Score conflict:')){toast('Score conflict — latest score loaded.');await refreshFromCloud();return;}
+  toast('Score not saved: '+error.message);return;
+}
 await refreshFromCloud();return;
 }
 const game=S.activeSession.courts[ci].games[gi];
