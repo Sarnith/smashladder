@@ -397,7 +397,7 @@ el('profile-wrap').appendChild(m);
 let onOutside;
 const close=()=>{m.remove();if(onOutside)document.removeEventListener('click',onOutside);};
 m.closeProfilePopover=close;
-el('profile-teams').addEventListener('click',()=>showTeamsInProfile(m));
+el('profile-teams').addEventListener('click',e=>{e.stopPropagation();showTeamsInProfile(m);});
 if(el('profile-admin'))el('profile-admin').addEventListener('click',()=>{close();showTab('admin');});
 if(el('profile-settings'))el('profile-settings').addEventListener('click',()=>{close();showTab('settings');});
 el('profile-logout').addEventListener('click',()=>{close();logout();});
