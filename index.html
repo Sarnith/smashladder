@@ -147,6 +147,19 @@ outline:none;cursor:pointer;flex-shrink:0;
 .profile-team-option.current{border-color:var(--green);}
 .profile-team-name{font-size:13px;font-weight:700;flex:1;}
 .profile-team-role{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;}
+.admin-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:2px 0 18px;}
+.admin-page-title{font-size:22px;font-weight:700;letter-spacing:-.4px;}
+.admin-page-copy{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.admin-list{padding:6px 16px;}
+.admin-list-head{display:flex;justify-content:space-between;padding:12px 2px 9px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;}
+.admin-team-row{display:flex;width:100%;align-items:center;gap:12px;background:transparent;border:0;border-top:1px solid var(--border);padding:14px 2px;color:var(--text);text-align:left;font-family:'Space Grotesk',sans-serif;cursor:pointer;}
+.admin-team-row:hover .admin-team-name{color:var(--green);}
+.admin-team-icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--court-mid);border:1px solid var(--border);font-size:16px;}
+.admin-team-name{font-size:14px;font-weight:700;transition:color .15s;}
+.admin-team-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.admin-team-arrow{color:var(--muted);font-size:18px;}
+.admin-form-label{display:block;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin:16px 0 7px;}
+.admin-account{background:var(--court-mid);border:1px solid var(--border);border-radius:9px;padding:12px;margin-top:8px;}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:14px;}
 .player-check{background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
 .player-check.attending{border-color:var(--green);background:var(--green-dim);}
@@ -480,6 +493,7 @@ let pendingRemovePlayer=null; // player id
 let pendingRemoveSession=null; // {ci, pid}
 let pendingRemoveRound=false; // confirm banner for "Remove Round N"
 let pendingDeleteSession=false; // confirm banner for deleting the latest history session
+let adminDirectory=[];
 
 // ── Tabs ──────────────────────────────────────────────────────────────
 let currentTab='ladder';
@@ -1201,21 +1215,34 @@ if(membersError){root.innerHTML='<div class="empty">Could not load Team Admins: 
 const adminIds=[...new Set((members||[]).map(m=>m.user_id))];
 const {data:profiles}=adminIds.length?await SB.from('user_profiles').select('user_id,email').in('user_id',adminIds):{data:[]};
 const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
-let h='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
-h+='<div class="section-label" style="margin-top:18px;">Manage teams</div>';
-(teams||[]).forEach(team=>{
-  const admins=(members||[]).filter(m=>m.team_id===team.id);
-  h+='<div class="card"><div class="section-label">Team</div><div class="add-form"><input class="add-input" id="team-name-'+team.id+'" value="'+esc(team.name)+'"><button class="btn btn-outline" data-rename-team="'+team.id+'">Save name</button></div><div class="section-label" style="margin-top:14px;">Team Admins</div>';
-  if(!admins.length)h+='<div style="font-size:12px;color:var(--red);">No Team Admin assigned.</div>';
-  admins.forEach(admin=>{
-    h+='<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px;"><div class="add-form" style="margin-bottom:8px;"><input class="add-input" id="team-admin-email-'+team.id+'-'+admin.user_id+'" type="email" value="'+esc(emailById[admin.user_id]||'')+'" data-original-email="'+esc(emailById[admin.user_id]||'')+'"><input class="add-input" id="team-admin-password-'+team.id+'-'+admin.user_id+'" type="password" minlength="8" placeholder="New password (optional)"></div><button class="btn btn-outline" data-save-team-admin="'+team.id+'" data-admin-user-id="'+admin.user_id+'">Save Team Admin</button><div id="team-admin-result-'+team.id+'-'+admin.user_id+'" style="font-size:12px;margin-top:8px;"></div></div>';
-  });
-  h+='</div>';
-});
+adminDirectory=(teams||[]).map(team=>({id:team.id,name:team.name,admins:(members||[]).filter(m=>m.team_id===team.id).map(m=>({userId:m.user_id,email:emailById[m.user_id]||''}))}));
+let h='<div class="admin-page-head"><div><div class="section-label">Platform workspace</div><div class="admin-page-title">Teams</div><div class="admin-page-copy">Create teams and manage their administrators.</div></div><button class="btn btn-primary" id="open-create-team">+ Create team</button></div>';
+h+='<div class="card admin-list"><div class="admin-list-head"><span>'+adminDirectory.length+' team'+(adminDirectory.length===1?'':'s')+'</span><span>Open to manage</span></div>';
+adminDirectory.forEach(team=>{const count=team.admins.length;const adminText=count?team.admins.map(a=>a.email).join(' · '):'No Team Admin assigned';h+='<button class="admin-team-row" data-manage-team="'+team.id+'"><span class="admin-team-icon">🏸</span><span style="flex:1;min-width:0;"><span class="admin-team-name">'+esc(team.name)+'</span><span class="admin-team-meta">'+esc(adminText)+'</span></span><span class="admin-team-arrow">›</span></button>';});
+h+='</div>';
 root.innerHTML=h;
-el('create-team-btn').addEventListener('click',createTeam);
-root.querySelectorAll('[data-rename-team]').forEach(btn=>btn.addEventListener('click',()=>saveTeamName(btn.dataset.renameTeam)));
-root.querySelectorAll('[data-save-team-admin]').forEach(btn=>btn.addEventListener('click',()=>saveTeamAdmin(btn.dataset.saveTeamAdmin,btn.dataset.adminUserId)));
+el('open-create-team').addEventListener('click',openCreateTeamModal);
+root.querySelectorAll('[data-manage-team]').forEach(btn=>btn.addEventListener('click',()=>openTeamManager(btn.dataset.manageTeam)));
+}
+
+function openCreateTeamModal(){
+const m=document.createElement('div');m.className='modal-bg';m.id='create-team-modal';
+m.innerHTML='<div class="modal"><button class="modal-close" id="create-team-close">✕</button><div class="modal-title">Create team</div><div class="modal-sub">Set up a team and its first Team Admin. Credentials are shared privately; no email is sent.</div><label class="admin-form-label">Team name</label><input class="add-input" id="new-team-name" placeholder="e.g. Thursday Smashers" style="width:100%;"><label class="admin-form-label">Team Admin email</label><input class="add-input" id="new-team-admin-email" type="email" placeholder="admin@example.com" style="width:100%;"><label class="admin-form-label">Temporary password</label><input class="add-input" id="new-team-admin-password" type="password" minlength="8" placeholder="8+ characters, or leave blank to generate" style="width:100%;"><div class="btn-row"><button class="btn btn-primary" id="create-team-btn">Create team</button><button class="btn btn-outline" id="create-team-cancel">Cancel</button></div><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
+document.body.appendChild(m);
+const close=()=>m.remove();
+el('create-team-close').addEventListener('click',close);el('create-team-cancel').addEventListener('click',close);el('create-team-btn').addEventListener('click',createTeam);m.addEventListener('click',e=>{if(e.target===m)close();});
+}
+
+function openTeamManager(teamId){
+const team=adminDirectory.find(t=>t.id===teamId);if(!team)return;
+const m=document.createElement('div');m.className='modal-bg';m.id='team-manager-modal';
+let admins=team.admins.length?'': '<div style="font-size:12px;color:var(--red);">No Team Admin is assigned to this team.</div>';
+team.admins.forEach(admin=>{admins+='<div class="admin-account"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">Team Admin</div><input class="add-input" id="team-admin-email-'+team.id+'-'+admin.userId+'" type="email" value="'+esc(admin.email)+'" data-original-email="'+esc(admin.email)+'" style="width:100%;margin-bottom:8px;"><input class="add-input" id="team-admin-password-'+team.id+'-'+admin.userId+'" type="password" minlength="8" placeholder="New password (optional)" style="width:100%;"><div class="btn-row" style="margin-top:10px;"><button class="btn btn-outline" data-save-team-admin="'+team.id+'" data-admin-user-id="'+admin.userId+'">Save account</button></div><div id="team-admin-result-'+team.id+'-'+admin.userId+'" style="font-size:12px;margin-top:8px;"></div></div>';});
+m.innerHTML='<div class="modal"><button class="modal-close" id="team-manager-close">✕</button><div class="modal-title">Manage '+esc(team.name)+'</div><div class="modal-sub">Update the team name or its Team Admin account details.</div><label class="admin-form-label">Team name</label><div class="add-form"><input class="add-input" id="team-name-'+team.id+'" value="'+esc(team.name)+'"><button class="btn btn-outline" id="save-team-name">Save</button></div><label class="admin-form-label">Team Admins</label>'+admins+'</div>';
+document.body.appendChild(m);
+const close=()=>m.remove();el('team-manager-close').addEventListener('click',close);m.addEventListener('click',e=>{if(e.target===m)close();});
+el('save-team-name').addEventListener('click',()=>saveTeamName(team.id));
+m.querySelectorAll('[data-save-team-admin]').forEach(btn=>btn.addEventListener('click',()=>saveTeamAdmin(btn.dataset.saveTeamAdmin,btn.dataset.adminUserId)));
 }
 
 async function createTeam(){
@@ -1228,7 +1255,7 @@ let functionError=error?.message||data?.error;
 if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}
 out.style.color=functionError?'var(--red)':'var(--green)';
 out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
-if(!error&&!data?.error){await startApp();}
+if(!error&&!data?.error){el('create-team-modal')?.remove();await startApp();}
 }
 
 async function manageTeam(payload){
@@ -1242,7 +1269,7 @@ const name=el('team-name-'+teamId).value.trim();
 if(!name){toast('Enter a team name.');return;}
 const error=await manageTeam({teamId,teamName:name});
 if(error){toast('Could not save team: '+error);return;}
-toast('Team name saved.');await startApp();
+el('team-manager-modal')?.remove();toast('Team name saved.');await startApp();
 }
 async function saveTeamAdmin(teamId,userId){
 const emailInput=el('team-admin-email-'+teamId+'-'+userId);
