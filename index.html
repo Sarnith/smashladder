@@ -140,6 +140,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:10px 0;}
 body.viewer #new-session-btn,body.viewer .tab[data-tab="players"],body.viewer .tab[data-tab="members"],body.viewer .tab[data-tab="settings"],body.viewer .session-panel .btn-row,body.viewer .pill-remove,body.viewer .edit-btn,body.viewer #del-latest-btn,body.viewer .remove-btn{display:none!important;}
 body.viewer .score-input,body.viewer .rank-edit-input,body.viewer .score-opt,body.viewer .pair-col{pointer-events:none;}
 body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer #cancel-session-btn,body.scorer #remove-round-btn,body.scorer .max-score-row{display:none!important;}
+body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 </style>
 </head>
 <body>
@@ -157,6 +158,7 @@ body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .t
 <button class="tab" data-tab="history">📋 History</button>
 <button class="tab" data-tab="players">👤 Players</button>
 <button class="tab" data-tab="members">👥 Members</button>
+<button class="tab" data-tab="admin">🛡️ Admin</button>
 <button class="tab" data-tab="settings">⚙️ Settings</button>
 </div>
 <div id="tab-ladder"></div>
@@ -164,6 +166,7 @@ body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .t
 <div id="tab-history" style="display:none"></div>
 <div id="tab-players" style="display:none"></div>
 <div id="tab-members" style="display:none"></div>
+<div id="tab-admin" style="display:none"></div>
 <div id="tab-settings" style="display:none"></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -315,8 +318,9 @@ CAN_EDIT=CURRENT_TEAM.app_role==='team_admin'||CURRENT_TEAM.app_role==='platform
 CAN_SCORE=CAN_EDIT||CURRENT_TEAM.app_role==='scorer';
 document.body.classList.toggle('viewer',!CAN_EDIT&&!CAN_SCORE);
 document.body.classList.toggle('scorer',!CAN_EDIT&&CAN_SCORE);
+document.body.classList.toggle('platform-admin',CURRENT_TEAM.app_role==='platform_admin');
 el('team-name').textContent=CURRENT_TEAM.team_name;
-if((!CAN_EDIT&&currentTab==='players')||(!CAN_EDIT&&currentTab==='members')||(!CAN_EDIT&&currentTab==='settings'))showTab('ladder');
+if((!CAN_EDIT&&currentTab==='players')||(!CAN_EDIT&&currentTab==='members')||(!CAN_EDIT&&currentTab==='settings')||(CURRENT_TEAM.app_role!=='platform_admin'&&currentTab==='admin'))showTab('ladder');
 if(!CAN_EDIT)localStorage.removeItem(DIRTY_KEY);
 
 // Changes made on this device that may not have reached the cloud (offline, or closed too fast)
@@ -432,7 +436,7 @@ const index=Number(answer)-1;if(Number.isInteger(index)&&TEAMS[index])switchTeam
 function showTab(t){
 currentTab=t;
 document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-['ladder','session','history','players','members','settings'].forEach(x=>
+['ladder','session','history','players','members','admin','settings'].forEach(x=>
 document.getElementById('tab-'+x).style.display=x===t?'':'none');
 pendingRemovePlayer=null;
 pendingRemoveSession=null;
@@ -446,6 +450,7 @@ if(currentTab==='session') renderSession();
 if(currentTab==='history') renderHistory();
 if(currentTab==='players') renderPlayers();
 if(currentTab==='members') renderMembers();
+if(currentTab==='admin') renderAdmin();
 if(currentTab==='settings') renderSettings();
 }
 
@@ -1093,7 +1098,6 @@ const{data:profiles}=ids.length?await SB.from('user_profiles').select('user_id,e
 const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
 const canCreateAdmin=CURRENT_TEAM.app_role==='platform_admin';
 let h='<div class="card"><div class="section-label">Team passcode</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Viewers enter <strong>'+esc(CURRENT_TEAM.team_name)+'</strong>, their email, and the shared passcode. It remains available to Team Admins for six hours after it is created or rotated.</div><div class="btn-row"><button class="btn btn-outline" id="passcode-btn">Show passcode</button><button class="btn btn-outline" id="rotate-passcode-btn">Rotate passcode</button></div><div id="passcode-result" style="margin-top:10px;font-family:Space Mono,monospace;color:var(--green);"></div></div>';
-if(canCreateAdmin)h+='<div class="card"><div class="section-label">Platform: create a team</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" placeholder="Temporary password — leave blank to generate" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
 const playerOptions='<option value="">Not linked to a player</option>'+S.players.filter(p=>p.email).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' — '+esc(p.email)+'</option>').join('');
 h+='<div class="card"><div class="section-label">Create account / promote player</div><div class="add-form"><input class="add-input" id="member-email" type="email" placeholder="Email"><select id="member-role" class="add-input" style="max-width:160px;"><option value="scorer">Scoring User</option>'+(canCreateAdmin?'<option value="team_admin">Team Admin</option>':'')+'</select></div><select id="member-player" class="add-input" style="width:100%;margin-bottom:10px;">'+playerOptions+'</select><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="add-input" id="member-password" type="password" placeholder="Temporary password — leave blank to generate"></div><button class="btn btn-primary" id="create-member-btn">Create account</button><div id="member-result" style="font-size:12px;margin-top:10px;color:var(--muted);"></div></div>';
 h+='<div class="section-label">Accounts</div>';
@@ -1102,15 +1106,6 @@ root.innerHTML=h;
 const showPasscode=async rotate=>{const{data,error}=await SB.rpc('create_or_rotate_viewer_passcode',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});el('passcode-result').textContent=error?error.message:(data?'Passcode: '+data:'This passcode is no longer available. Rotate it to generate a new one.');};
 el('passcode-btn').addEventListener('click',()=>showPasscode(false));el('rotate-passcode-btn').addEventListener('click',()=>showPasscode(true));
 showPasscode(false);
-if(canCreateAdmin)el('create-team-btn').addEventListener('click',async()=>{
-const teamName=el('new-team-name').value.trim(),email=el('new-team-admin-email').value.trim(),password=el('new-team-admin-password').value;
-if(!teamName||!email){el('create-team-result').textContent='Enter a team name and Team Admin email.';return;}
-const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'create_team',teamName,email,role:'team_admin',password:password||undefined,generatePassword:!password}});
-let functionError=error?.message||data?.error;
-if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}
-const out=el('create-team-result');out.style.color=functionError?'var(--red)':'var(--green)';out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
-if(!error&&!data?.error){await startApp();}
-});
 el('member-player').addEventListener('change',()=>{const p=gp(el('member-player').value);if(p?.email)el('member-email').value=p.email;});
 el('create-member-btn').addEventListener('click',async()=>{
 const email=el('member-email').value.trim(),password=el('member-password').value;
@@ -1121,6 +1116,25 @@ el('member-result').style.color=error||data?.error?'var(--red)':'var(--green)';
 el('member-result').textContent=error||data?.error||(data.temporaryPassword?'Account created. Temporary password: '+data.temporaryPassword:'Account created.');
 if(!error&&!data?.error)renderMembers();
 });
+}
+
+function renderAdmin(){
+const root=el('tab-admin');
+if(CURRENT_TEAM?.app_role!=='platform_admin'){root.innerHTML='';return;}
+root.innerHTML='<div class="card"><div class="section-label">Create a team</div><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Create a team and its first Team Admin. No invitation email is sent; share the account credentials privately.</div><div class="add-form"><input class="add-input" id="new-team-name" placeholder="Team name"><input class="add-input" id="new-team-admin-email" type="email" placeholder="Team Admin email"></div><input class="add-input" id="new-team-admin-password" type="password" placeholder="Temporary password — leave blank to generate" style="width:100%;margin-bottom:10px;"><button class="btn btn-primary" id="create-team-btn">Create team and Team Admin</button><div id="create-team-result" style="font-size:12px;margin-top:10px;"></div></div>';
+el('create-team-btn').addEventListener('click',createTeam);
+}
+
+async function createTeam(){
+const teamName=el('new-team-name').value.trim(),email=el('new-team-admin-email').value.trim(),password=el('new-team-admin-password').value;
+const out=el('create-team-result');
+if(!teamName||!email){out.textContent='Enter a team name and Team Admin email.';return;}
+const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'create_team',teamName,email,role:'team_admin',password:password||undefined,generatePassword:!password}});
+let functionError=error?.message||data?.error;
+if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}
+out.style.color=functionError?'var(--red)':'var(--green)';
+out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
+if(!error&&!data?.error){await startApp();}
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
