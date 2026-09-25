@@ -205,7 +205,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:10px 0;}
 /* Read-only viewers: hide every editing control (the database enforces this too) */
 body.viewer #new-session-btn,body.viewer .tab[data-tab="players"],body.viewer .tab[data-tab="members"],body.viewer .tab[data-tab="settings"],body.viewer .session-panel .btn-row,body.viewer .pill-remove,body.viewer .edit-btn,body.viewer #del-latest-btn,body.viewer .remove-btn{display:none!important;}
 body.viewer .score-input,body.viewer .rank-edit-input,body.viewer .score-opt,body.viewer .pair-col{pointer-events:none;}
-body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer #cancel-session-btn,body.scorer #remove-round-btn,body.scorer .max-score-row{display:none!important;}
+body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer #cancel-session-btn,body.scorer #remove-round-btn,body.scorer #finalise-btn,body.scorer #advance-round-btn,body.scorer .max-score-row{display:none!important;}
 body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 </style>
 </head>
@@ -1195,6 +1195,7 @@ return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?sessi
 
 // ── Advance to next round ───────────────────────────────────────────────
 function advanceRound(){
+if(!CAN_EDIT){toast('Only a team admin can move to the next round');return;}
 const s=S.activeSession;
 s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
@@ -1228,6 +1229,7 @@ save();renderSession();toast('Round '+removed+' removed');
 
 // ── Finalise ──────────────────────────────────────────────────────────
 function finaliseSession(){
+if(!CAN_EDIT){toast('Only a team admin can finish the session');return;}
 const s=S.activeSession;
 const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
 
@@ -1265,6 +1267,12 @@ save();showTab('ladder');toast('Rankings updated! 🏆');
 }
 
 function cancelSession(){
+if(!CAN_EDIT){toast('Only a team admin can cancel the session');return;}
+const s=S.activeSession;
+const done=s.rounds?s.rounds.length:0;
+if(!confirm('Cancel this session?\n\nNothing is added to History'+(done?', and the wins, losses and points from the '+done+' completed round'+(done>1?'s':'')+' are removed from the ladder':'')+'.'))return;
+// Rounds already advanced past have had their stats booked — take them back off
+(s.rounds||[]).forEach(r=>r.courts.forEach(unaccumulateStats));
 S.activeSession=null;save();showTab('ladder');toast('Session cancelled');
 }
 
