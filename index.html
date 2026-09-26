@@ -101,8 +101,11 @@ header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space
 /* Ladder history: rank after each of the last 5 sessions as columns */
 .ladder-row{gap:4px 6px;}
 .ladder-head{display:grid;gap:4px 6px;align-items:end;padding:0 16px 6px;}
-.lh-date{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);text-align:center;line-height:1.2;cursor:help;}
-.lh-cell{display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:6px;border:1px solid transparent;background:var(--court-mid);color:var(--muted);font-family:'Space Mono',monospace;font-size:12px;font-weight:700;cursor:help;}
+.lh-date{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);text-align:center;line-height:1.2;}
+.lh-tip{position:fixed;z-index:150;display:none;max-width:240px;background:var(--text);color:var(--bg);font-size:12px;line-height:1.5;padding:7px 10px;border-radius:8px;box-shadow:0 8px 24px var(--shadow);pointer-events:none;}
+.lh-tip-title{font-weight:700;}
+.lh-cell:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.lh-cell{display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:6px;border:1px solid transparent;background:var(--court-mid);color:var(--muted);font-family:'Space Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;}
 .lh-cell.up{background:var(--up-dim);color:var(--up);}
 .lh-cell.down{background:var(--red-dim);color:var(--red);}
 .lh-cell.absent{border:1px dashed var(--muted);}
@@ -753,11 +756,11 @@ function renderLadder(){
 const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const root=el('tab-ladder');
 if(!sorted.length){root.innerHTML='<div class="empty"><div class="empty-icon">🏸</div>No players yet.<br>Add players in the Players tab.</div>';return;}
-const hist=ladderHistory(5);
+const hist=ladderHistory(5).reverse(); // newest session first
 const stats=hist.map(c=>sessionPlayerStats(c.s));
 const cols='grid-template-columns:34px minmax(0,1fr)'+(hist.length?' repeat('+hist.length+',30px)':' auto')+';';
 let h='<div class="ladder-head" style="'+cols+'"><span></span><span class="section-label" style="margin:0;">'+sorted.length+' players ranked</span>'
-+hist.map(c=>'<span class="lh-date" title="'+esc(c.s.date)+(c.exact?'':' — rebuilt from rank changes, may be approximate')+'">'+esc(shortDate(c.s.date))+(c.exact?'':'≈')+'</span>').join('')+'</div>';
++hist.map(c=>'<span class="lh-date">'+esc(shortDate(c.s.date))+(c.exact?'':'≈')+'</span>').join('')+'</div>';
 sorted.forEach(p=>{
 const ac=p.rank===1?'gold':p.rank===2?'silver':p.rank===3?'bronze':'';
 const rc=p.rank===1?'rank-gold':p.rank===2?'rank-silver':p.rank===3?'rank-bronze':'';
@@ -766,10 +769,11 @@ let tail;
 if(hist.length){
 tail=hist.map((c,i)=>{
 const r=c.after[p.id];
-if(r===undefined)return'<span class="lh-cell none" title="'+esc(c.s.date)+': not on the ladder yet"></span>';
+if(r===undefined)return'<span class="lh-cell none" data-tip-title="'+esc(c.s.date)+'" data-tip="Not on the ladder yet"></span>';
 const d=c.delta[p.id]||0,absent=(c.s.skipped||[]).includes(p.id),st=stats[i][p.id];
-const tip=c.s.date+': #'+r+(d>0?' (▲'+d+')':d<0?' (▼'+(-d)+')':'')+(absent?' · absent (−2)':st?' · '+st.w+'W '+st.l+'L · '+st.pts+' pts':'');
-return'<span class="lh-cell'+(d>0?' up':d<0?' down':'')+(absent?' absent':'')+'" title="'+esc(tip)+'">'+r+'</span>';
+const move=d>0?'▲'+d+' from #'+(r+d):d<0?'▼'+(-d)+' from #'+(r+d):'no change';
+const tip='#'+r+' · '+move+'|'+(absent?'Absent · dropped 2 places':st?st.w+'W '+st.l+'L · '+st.pts+' pts':'Played, no scored games');
+return'<span class="lh-cell'+(d>0?' up':d<0?' down':'')+(absent?' absent':'')+'" tabindex="0" data-tip-title="'+esc(c.s.date)+'" data-tip="'+esc(tip)+'">'+r+'</span>';
 }).join('');
 }else{
 const d=p.rankDelta||0;
@@ -777,9 +781,39 @@ tail=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta 
 }
 h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row ladder-row" style="'+cols+'"><div class="rank-num">'+p.rank+'</div><div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+tail+'</div></div>';
 });
-if(hist.length)h+='<div class="lh-legend"><span class="lh-cell up">3</span> climbed <span class="lh-cell down">5</span> dropped <span class="lh-cell absent">7</span> absent (−2) · rank after each of the last '+hist.length+' session'+(hist.length>1?'s':'')+', oldest → newest</div>';
+if(hist.length)h+='<div class="lh-legend"><span class="lh-cell up">3</span> climbed <span class="lh-cell down">5</span> dropped <span class="lh-cell absent">7</span> absent (−2) · rank after each of the last '+hist.length+' session'+(hist.length>1?'s':'')+', newest → oldest'+(hist.some(c=>!c.exact)?' · ≈ rebuilt from older data, may be approximate':'')+'</div>';
 root.innerHTML=h;
 }
+// Rank-history cell details: shown on hover (desktop), on tap (phones) and on keyboard focus.
+// A custom tooltip because the browser's title tooltip is slow to appear and never shows on touch.
+function showLadderTip(cell){
+let t=el('lh-tip');
+if(!t){t=document.createElement('div');t.id='lh-tip';t.className='lh-tip';t.setAttribute('role','tooltip');document.body.appendChild(t);}
+t.innerHTML='<div class="lh-tip-title">'+esc(cell.dataset.tipTitle)+'</div>'+cell.dataset.tip.split('|').map(l=>'<div>'+esc(l)+'</div>').join('');
+t.style.display='block';
+const r=cell.getBoundingClientRect(),w=t.offsetWidth,hh=t.offsetHeight;
+const left=Math.min(Math.max(8,r.left+r.width/2-w/2),innerWidth-w-8);
+const top=r.top-hh-8>=8?r.top-hh-8:r.bottom+8; // above the cell, or below when there's no room
+t.style.left=left+'px';t.style.top=top+'px';
+tipCell=cell;
+}
+function hideLadderTip(){const t=el('lh-tip');if(t)t.style.display='none';tipCell=null;}
+let tipCell=null;
+(()=>{
+const root=el('tab-ladder');
+const cellOf=e=>e.target.closest&&e.target.closest('.lh-cell[data-tip]');
+root.addEventListener('mouseover',e=>{const c=cellOf(e);if(c)showLadderTip(c);});
+root.addEventListener('mouseout',e=>{const c=cellOf(e);if(c&&!c.contains(e.relatedTarget))hideLadderTip();});
+root.addEventListener('focusin',e=>{const c=cellOf(e);if(c)showLadderTip(c);});
+root.addEventListener('focusout',hideLadderTip);
+document.addEventListener('click',e=>{ // tap toggles on touch screens; tapping elsewhere closes
+const c=cellOf(e);
+if(c){if(tipCell!==c)showLadderTip(c);return;}
+hideLadderTip();
+});
+addEventListener('scroll',()=>{if(tipCell)showLadderTip(tipCell);},{passive:true}); // follow the cell (tapping can scroll it into view)
+addEventListener('resize',hideLadderTip);
+})();
 
 // ── Players tab ───────────────────────────────────────────────────────
 function renderPlayers(){
