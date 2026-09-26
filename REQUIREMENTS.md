@@ -75,6 +75,13 @@ Items are grouped so related changes ship together. Original request numbers are
 
 _None right now._
 
+## Release checklist
+
+1. Supabase SQL editor: run `supabase/migrations/20260927_viewer_share_link.sql`, then `supabase/migrations/20260927_score_rules.sql`.
+2. Merge the PR (site redeploys from `main`).
+3. Smoke-test: team admin (session, rounds, end session, share link), scorer (enter scores incl. invalid ones), share link in a private window.
+4. If something breaks: revert the merge commit on `main`; if the problem is in the database, run `supabase/rollback/20260927_rollback.sql`. **Always run the rollback if the page is reverted but the score-rules migration stays** — the old page can't save deuce scores otherwise.
+
 ## Order
 
 1. ~~**A** (safety)~~ ✅
