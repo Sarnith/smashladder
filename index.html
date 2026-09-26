@@ -40,6 +40,17 @@ header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space
 .delta-up{color:var(--green);}
 .delta-down{color:var(--red);}
 .delta-none{color:var(--muted);}
+/* Ladder history: rank after each of the last 5 sessions as columns */
+.ladder-row{gap:4px 6px;}
+.ladder-head{display:grid;gap:4px 6px;align-items:end;padding:0 16px 6px;}
+.lh-date{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);text-align:center;line-height:1.2;cursor:help;}
+.lh-cell{display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:6px;border:1px solid transparent;background:var(--court-mid);color:var(--muted);font-family:'Space Mono',monospace;font-size:12px;font-weight:700;cursor:help;}
+.lh-cell.up{background:var(--green-dim);color:var(--green);}
+.lh-cell.down{background:var(--red-dim);color:var(--red);}
+.lh-cell.absent{border:1px dashed var(--muted);}
+.lh-cell.none{background:transparent;}
+.lh-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6;}
+.lh-legend .lh-cell{width:22px;height:20px;font-size:10px;cursor:default;}
 /* Remove button */
 .rank-edit-input{
 width:42px;height:42px;text-align:center;
@@ -605,19 +616,64 @@ inp.focus();
 }
 
 // ── Ladder ────────────────────────────────────────────────────────────
+// The ladder after each of the last `n` sessions, oldest first: [{s, after:{id:rank}, delta:{id:±n}, exact}].
+// Sessions finalised with a rank snapshot are exact. Older ones are rebuilt by walking back from the
+// next known ladder with that session's rank changes — approximate if ranks were edited by hand or
+// players were added/removed in between.
+function ladderHistory(n){
+const idByName={};S.players.forEach(p=>idByName[p.name]=p.id);
+let known={};S.players.forEach(p=>known[p.id]=p.rank); // ladder after the session being looked at
+const out=[];
+for(let k=S.sessions.length-1;k>=0&&out.length<n;k--){
+const s=S.sessions[k];
+const after=s.ranksAfter||known;
+const delta={};(s.rankChanges||[]).forEach(r=>{const id=idByName[r.name];if(id!==undefined)delta[id]=r.delta;});
+out.unshift({s,after,delta,exact:!!s.ranksAfter});
+const before={};Object.keys(after).forEach(id=>before[id]=after[id]+(delta[id]||0));
+known=before;
+}
+return out;
+}
+// Wins, losses and points per player across every round of a session
+function sessionPlayerStats(s){
+const st={};
+(s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts||[]}]).forEach(r=>(r.courts||[]).forEach(c=>c.games.forEach(g=>{
+if(g.s1===null||g.s2===null)return;
+const add=(ids,pts,won)=>ids.forEach(id=>{const x=st[id]||(st[id]={w:0,l:0,pts:0});x.pts+=pts;won?x.w++:x.l++;});
+add(g.pair1,g.s1,g.s1>g.s2);add(g.pair2,g.s2,g.s2>g.s1);
+})));
+return st;
+}
+function shortDate(d){const[day,mon]=String(d).split(' ');return mon?day+' '+mon.slice(0,3):String(d);}
 function renderLadder(){
 const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const root=el('tab-ladder');
 if(!sorted.length){root.innerHTML='<div class="empty"><div class="empty-icon">🏸</div>No players yet.<br>Add players in the Players tab.</div>';return;}
-let h='<div class="section-label">'+sorted.length+' players ranked</div>';
+const hist=ladderHistory(5);
+const stats=hist.map(c=>sessionPlayerStats(c.s));
+const cols='grid-template-columns:34px minmax(0,1fr)'+(hist.length?' repeat('+hist.length+',30px)':' auto')+';';
+let h='<div class="ladder-head" style="'+cols+'"><span></span><span class="section-label" style="margin:0;">'+sorted.length+' players ranked</span>'
++hist.map(c=>'<span class="lh-date" title="'+esc(c.s.date)+(c.exact?'':' — rebuilt from rank changes, may be approximate')+'">'+esc(shortDate(c.s.date))+(c.exact?'':'≈')+'</span>').join('')+'</div>';
 sorted.forEach(p=>{
 const ac=p.rank===1?'gold':p.rank===2?'silver':p.rank===3?'bronze':'';
 const rc=p.rank===1?'rank-gold':p.rank===2?'rank-silver':p.rank===3?'rank-bronze':'';
-const d=p.rankDelta||0;
-const dh=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta delta-down">▼'+Math.abs(d)+'</span>':'<span class="delta delta-none">—</span>';
 const wr=(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):0;
-h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row"><div class="rank-num">'+p.rank+'</div><div><div class="player-name">'+p.name+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+dh+'</div></div>';
+let tail;
+if(hist.length){
+tail=hist.map((c,i)=>{
+const r=c.after[p.id];
+if(r===undefined)return'<span class="lh-cell none" title="'+esc(c.s.date)+': not on the ladder yet"></span>';
+const d=c.delta[p.id]||0,absent=(c.s.skipped||[]).includes(p.id),st=stats[i][p.id];
+const tip=c.s.date+': #'+r+(d>0?' (▲'+d+')':d<0?' (▼'+(-d)+')':'')+(absent?' · absent (−2)':st?' · '+st.w+'W '+st.l+'L · '+st.pts+' pts':'');
+return'<span class="lh-cell'+(d>0?' up':d<0?' down':'')+(absent?' absent':'')+'" title="'+esc(tip)+'">'+r+'</span>';
+}).join('');
+}else{
+const d=p.rankDelta||0;
+tail=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta delta-down">▼'+Math.abs(d)+'</span>':'<span class="delta delta-none">—</span>';
+}
+h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row ladder-row" style="'+cols+'"><div class="rank-num">'+p.rank+'</div><div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+tail+'</div></div>';
 });
+if(hist.length)h+='<div class="lh-legend"><span class="lh-cell up">3</span> climbed <span class="lh-cell down">5</span> dropped <span class="lh-cell absent">7</span> absent (−2) · rank after each of the last '+hist.length+' session'+(hist.length>1?'s':'')+', oldest → newest</div>';
 root.innerHTML=h;
 }
 

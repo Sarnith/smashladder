@@ -39,11 +39,11 @@ Items are grouped so related changes ship together. Original request numbers are
 | D1 [8] | Default ranking within a court = **Wins, then Points**; toggle for **Points only**. | ✅ | Setup defaults to "Wins then Points"; "Points only" is the alternative. Live standings and round summaries show wins when they count. |
 | D2 [7] | **Tie-break at the promotion/relegation line.** Example 5-player court: A 53, B 55, C 52, D 52, E 50 → E is relegated outright; C vs D tie is decided in favour of **the player who moved up into this court last round** (the climber stays up). | ✅ | `tallyCourt()` order: wins (when D1 applies) → points → **climber first** → current ladder rank. `regroupForNextRound()` records `court.climbers`; Round 1 has none, so it falls back to ladder rank. Climbers show a ↑ in live standings. Applies to every tie in the court, not only at the relegation line. |
 
-## E. Ladder
+## E. Ladder — ✅ done
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| E1 [11] | Ladder shows **history of the last 5 sessions**. | ⬜ | Proposal: per player, a small rank trend over the last 5 sessions (e.g. `#4 → #3 → #3 → #2 → #2`) plus W/L form. Data already exists in `session.ranksAfter`. |
+| E1 [11] | Ladder shows **history of the last 5 sessions**. | ✅ | Last 5 sessions as columns (oldest → newest): rank after each session, green = climbed, red = dropped, dashed = absent (−2), blank = not on the ladder yet. Hover shows that session's W–L and points. Sessions without a rank snapshot are rebuilt from rank changes and marked ≈. |
 
 ## F. Access
 
@@ -67,11 +67,12 @@ Items are grouped so related changes ship together. Original request numbers are
 - **C2** — Deuce is allowed. Caps: 30 for 21-pt games, 21 for 15-pt games (decided by Claude, per BWF 15-pt format).
 - **C3** — "RTL" means entering the right-hand team's score first.
 - **D2** — Tie at the relegation line: the player who moved up into this court last round stays up.
+- **E1** — Last 5 sessions as columns on the ladder.
 - **G1** — Light + dark themes and a better palette.
 
 ## Open questions
 
-1. **E1** — Rank trend, W/L form, points per session, or a mix?
+_None right now._
 
 ## Order
 
@@ -79,6 +80,6 @@ Items are grouped so related changes ship together. Original request numbers are
 2. ~~**B** (round flow)~~ ✅
 3. ~~**D** (ranking rules)~~ ✅
 4. ~~**C** (scoring UX / court tabs)~~ ✅
-5. **E** (ladder history).
+5. ~~**E** (ladder history)~~ ✅
 6. **F** (share URL) — needs a DB migration.
 7. **G** (theme) — last, so it restyles the final UI.
