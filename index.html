@@ -4,42 +4,118 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smash Ladder</title>
+<script>
+// Theme is chosen per device (Profile → Theme). Applied before first paint so the page doesn't flash.
+(function(){
+var t='court',m='system';
+try{t=localStorage.getItem('smash_theme')||t;m=localStorage.getItem('smash_mode')||m;}catch(e){}
+var d=document.documentElement;
+d.dataset.theme=t;
+d.dataset.mode=m==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):m;
+})();
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
-:root{
---court:#0d1f0f;--court-mid:#142918;--court-line:#1e3d22;
---green:#4ade80;--green-dim:#22c55e33;--yellow:#fbbf24;
---red:#f87171;--red-dim:#f8717122;--text:#e8f5e9;--muted:#6b7c6d;--card:#162019;--border:#243d27;
+/* Themes: data-theme picks the palette, data-mode picks light/dark (see applyTheme).
+   Roles: bg page · card/court-mid surfaces · court-line subtle fill · accent brand colour ·
+   on-accent text on accent fills · up/red climbed-won/dropped-lost · gold/silver/bronze medals. */
+:root,[data-theme="court"][data-mode="dark"]{
+--bg:#0d1f0f;--card:#162019;--court-mid:#142918;--court-line:#1e3d22;--border:#243d27;
+--text:#e8f5e9;--muted:#7f9884;--accent:#4ade80;--accent-dim:#22c55e33;--on-accent:#0b2414;
+--up:#4ade80;--up-dim:#22c55e33;--red:#f87171;--red-dim:#f8717122;--yellow:#fbbf24;
+--gold:#fbbf24;--silver:#94a3b8;--bronze:#d97706;--overlay:rgba(0,0,0,.75);--shadow:rgba(0,0,0,.42);--grid:.25;
 }
+[data-theme="court"][data-mode="light"]{
+--bg:#eef4ee;--card:#ffffff;--court-mid:#f4f8f3;--court-line:#dcebdd;--border:#d3e0d4;
+--text:#12261a;--muted:#5d7263;--accent:#15803d;--accent-dim:#15803d1f;--on-accent:#ffffff;
+--up:#15803d;--up-dim:#dcf3e2;--red:#b42318;--red-dim:#fbe1e1;--yellow:#a16207;
+--gold:#b7860b;--silver:#64748b;--bronze:#b45309;--overlay:rgba(18,38,26,.45);--shadow:rgba(18,38,26,.14);--grid:.6;
+}
+[data-theme="night"][data-mode="dark"]{
+--bg:#0b1220;--card:#121c30;--court-mid:#0f182a;--court-line:#1c2944;--border:#22304d;
+--text:#e8edf7;--muted:#8391ad;--accent:#d4f542;--accent-dim:#d4f54226;--on-accent:#1a2305;
+--up:#5fe0a8;--up-dim:#5fe0a826;--red:#f58ca0;--red-dim:#f58ca022;--yellow:#fbbf24;
+--gold:#fbbf24;--silver:#a5b4cf;--bronze:#e08a4a;--overlay:rgba(2,6,14,.78);--shadow:rgba(0,0,0,.5);--grid:.25;
+}
+[data-theme="night"][data-mode="light"]{
+--bg:#eef2f9;--card:#ffffff;--court-mid:#f5f7fc;--court-line:#e1e8f5;--border:#d6deec;
+--text:#101a2e;--muted:#5b6680;--accent:#1d3a8a;--accent-dim:#1d3a8a1a;--on-accent:#ffffff;
+--up:#0f7a50;--up-dim:#d9f2e6;--red:#b4233f;--red-dim:#fbe1e6;--yellow:#a16207;
+--gold:#b7860b;--silver:#64748b;--bronze:#b45309;--overlay:rgba(16,26,46,.45);--shadow:rgba(16,26,46,.14);--grid:.6;
+}
+[data-theme="indigo"][data-mode="dark"]{
+--bg:#12111b;--card:#1b1a29;--court-mid:#171624;--court-line:#26243b;--border:#2d2b45;
+--text:#ebe9f7;--muted:#8f8baa;--accent:#a99bff;--accent-dim:#8b7cf62e;--on-accent:#150f33;
+--up:#6ee7a5;--up-dim:#6ee7a526;--red:#f59090;--red-dim:#f5909022;--yellow:#fbbf24;
+--gold:#fbbf24;--silver:#a8b1c7;--bronze:#e08a4a;--overlay:rgba(5,4,12,.78);--shadow:rgba(0,0,0,.5);--grid:.25;
+}
+[data-theme="indigo"][data-mode="light"]{
+--bg:#f2f1f9;--card:#ffffff;--court-mid:#f7f6fc;--court-line:#e7e4f7;--border:#e0ddef;
+--text:#17152b;--muted:#63607d;--accent:#5b47d6;--accent-dim:#5b47d61a;--on-accent:#ffffff;
+--up:#15803d;--up-dim:#dcf3e5;--red:#b42318;--red-dim:#fbe1e1;--yellow:#a16207;
+--gold:#b7860b;--silver:#64748b;--bronze:#b45309;--overlay:rgba(23,21,43,.45);--shadow:rgba(23,21,43,.14);--grid:.6;
+}
+[data-theme="clay"][data-mode="dark"]{
+--bg:#19130f;--card:#241b16;--court-mid:#1f1813;--court-line:#33261e;--border:#3a2b22;
+--text:#f5ebe3;--muted:#a8937f;--accent:#f08a4b;--accent-dim:#e8743a2e;--on-accent:#2a1206;
+--up:#78e09a;--up-dim:#78e09a24;--red:#f5968c;--red-dim:#f5968c22;--yellow:#fbbf24;
+--gold:#f5c542;--silver:#b8b2aa;--bronze:#d9864f;--overlay:rgba(10,6,3,.78);--shadow:rgba(0,0,0,.5);--grid:.25;
+}
+[data-theme="clay"][data-mode="light"]{
+--bg:#f7f0e8;--card:#ffffff;--court-mid:#fbf7f2;--court-line:#f1e4d6;--border:#ecdfd3;
+--text:#2a1c14;--muted:#7a6557;--accent:#b8501c;--accent-dim:#b8501c1a;--on-accent:#ffffff;
+--up:#1d6b35;--up-dim:#dcf0e0;--red:#b42318;--red-dim:#fbe0dc;--yellow:#a16207;
+--gold:#b7860b;--silver:#6b7280;--bronze:#9a3412;--overlay:rgba(42,28,20,.45);--shadow:rgba(42,28,20,.14);--grid:.6;
+}
+[data-mode="dark"]{color-scheme:dark;}
+[data-mode="light"]{color-scheme:light;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Space Grotesk',sans-serif;background:var(--court);color:var(--text);min-height:100vh;}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 body::before{content:'';position:fixed;inset:0;
 background-image:linear-gradient(to right,var(--court-line) 1px,transparent 1px),linear-gradient(to bottom,var(--court-line) 1px,transparent 1px);
-background-size:60px 60px;opacity:.25;pointer-events:none;z-index:0;}
+background-size:60px 60px;opacity:var(--grid);pointer-events:none;z-index:0;}
 .wrap{position:relative;z-index:1;max-width:880px;margin:0 auto;padding:0 14px 60px;}
 header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.logo-text{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--green);}
+.logo-text{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);}
 .logo-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
-.session-btn{background:var(--green);color:var(--court);border:none;padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.session-btn{background:var(--accent);color:var(--on-accent);border:none;padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
 .tabs{display:flex;gap:3px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:20px;overflow-x:auto;}
 .tab{flex:1 0 auto;padding:8px 10px;border:none;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;border-radius:7px;cursor:pointer;text-align:center;white-space:nowrap;}
-.tab.active{background:var(--court-line);color:var(--green);}
+.tab.active{background:var(--court-line);color:var(--accent);}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;position:relative;overflow:hidden;}
 .card-accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border);}
-.card-accent.gold{background:var(--yellow);}
-.card-accent.silver{background:#94a3b8;}
-.card-accent.bronze{background:#b45309;}
+.card-accent.gold{background:var(--gold);}
+.card-accent.silver{background:var(--silver);}
+.card-accent.bronze{background:var(--bronze);}
 .player-row{display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:10px;}
 .rank-num{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--muted);text-align:center;}
-.rank-gold .rank-num{color:var(--yellow);}
-.rank-silver .rank-num{color:#94a3b8;}
-.rank-bronze .rank-num{color:#b45309;}
+.rank-gold .rank-num{color:var(--gold);}
+.rank-silver .rank-num{color:var(--silver);}
+.rank-bronze .rank-num{color:var(--bronze);}
 .player-name{font-size:15px;font-weight:600;}
 .player-stats{font-size:11px;color:var(--muted);margin-top:2px;}
 .delta{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;}
-.delta-up{color:var(--green);}
+.delta-up{color:var(--up);}
 .delta-down{color:var(--red);}
 .delta-none{color:var(--muted);}
+/* Ladder history: rank after each of the last 5 sessions as columns */
+.ladder-row{gap:4px 6px;}
+.ladder-head{display:grid;gap:4px 6px;align-items:end;padding:0 16px 6px;}
+.lh-date{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);text-align:center;line-height:1.2;cursor:help;}
+.lh-cell{display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:6px;border:1px solid transparent;background:var(--court-mid);color:var(--muted);font-family:'Space Mono',monospace;font-size:12px;font-weight:700;cursor:help;}
+.lh-cell.up{background:var(--up-dim);color:var(--up);}
+.lh-cell.down{background:var(--red-dim);color:var(--red);}
+.lh-cell.absent{border:1px dashed var(--muted);}
+.lh-cell.none{background:transparent;}
+.lh-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6;}
+.lh-legend .lh-cell{width:22px;height:20px;font-size:10px;cursor:default;}
+/* Share link row (Members tab) */
+.share-row{display:flex;gap:8px;margin-top:12px;}
+.share-row .add-input{flex:1;min-width:0;font-family:'Space Mono',monospace;font-size:12px;}
+/* Theme picker (Profile → Theme) */
+.theme-mode{display:flex;gap:6px;padding:4px 4px 10px;}
+.theme-mode .score-opt{flex:1;padding:7px 6px;}
+.theme-swatch{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);flex-shrink:0;}
 /* Remove button */
 .rank-edit-input{
 width:42px;height:42px;text-align:center;
@@ -47,52 +123,67 @@ background:var(--court-mid);border:1px solid var(--border);border-radius:8px;
 color:var(--muted);font-family:'Space Mono',monospace;font-size:18px;font-weight:700;
 outline:none;cursor:pointer;flex-shrink:0;
 }
-.rank-edit-input:focus{border-color:var(--green);color:var(--green);}
+.rank-edit-input:focus{border-color:var(--accent);color:var(--accent);}
 .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .remove-btn:hover{background:var(--red-dim);}
-/* Inline confirm banner */
-.confirm-banner{background:var(--red-dim);border:1px solid rgba(248,113,113,.4);border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;}
-.confirm-banner-msg{color:var(--red);}
-.confirm-banner-btns{display:flex;gap:7px;flex-shrink:0;}
-.cbtn-yes{background:var(--red);color:#fff;border:none;padding:5px 12px;border-radius:5px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
-.cbtn-no{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:5px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
-/* Neutral variant of the confirm banner (removing an unstarted round) */
-.confirm-banner.neutral{background:var(--court-mid);border-color:var(--border);}
-.confirm-banner.neutral .confirm-banner-msg{color:var(--text);}
-.confirm-banner.neutral .cbtn-yes{background:var(--green);color:var(--court);}
+/* Two-step (type to confirm) dialog for destructive actions */
+.danger-impact{background:var(--red-dim);border:1px solid color-mix(in srgb,var(--red) 40%,transparent);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.55;color:var(--text);margin-bottom:6px;}
+.danger-word{font-family:'Space Mono',monospace;color:var(--red);}
+/* Rarely-used session actions, tucked away from the main button */
+.more-menu{margin-top:16px;border-top:1px solid var(--border);padding-top:10px;}
+.more-menu summary{list-style:none;cursor:pointer;font-size:12px;color:var(--muted);user-select:none;}
+.more-menu summary::-webkit-details-marker{display:none;}
+.more-menu-body{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;}
+.more-menu-hint{font-size:11px;color:var(--muted);line-height:1.5;max-width:420px;}
+/* Finished rounds, summarised under the current round */
+.round-summary{padding:12px 14px;}
+.round-summary-title{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.5px;margin-bottom:4px;}
+.round-summary-court{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;}
+.round-games{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+.round-games summary{cursor:pointer;font-size:12px;color:var(--muted);}
+/* Court tabs — pinned while scrolling so a scorer can hop between courts */
+.court-tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:12px;}
+.court-tab{flex:1 0 auto;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border:none;border-radius:7px;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.court-tab.active{background:var(--court-line);color:var(--accent);}
+.court-tab-prog{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--court-mid);color:var(--yellow);}
+.court-tab.done .court-tab-prog{color:var(--up);}
 /* Session */
 .session-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
 .session-title{font-size:15px;font-weight:700;margin-bottom:4px;}
 .session-meta{font-size:12px;color:var(--muted);margin-bottom:12px;}
 .progress-wrap{background:var(--border);border-radius:4px;height:4px;margin-bottom:16px;overflow:hidden;}
-.progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s;}
+.progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s;}
 .court-block{background:var(--court-mid);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
 .court-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.court-lbl{font-size:12px;font-weight:700;color:var(--green);letter-spacing:1px;text-transform:uppercase;}
+.court-lbl{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;}
 .court-fmt{font-size:11px;color:var(--muted);}
 .court-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
 .pill{font-size:12px;font-weight:600;background:var(--court-line);border:1px solid var(--border);border-radius:20px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px;}
 .pill-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:700;padding:0;line-height:1;}
-.max-score-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--muted);}
+.max-score-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--muted);}
 .score-opt{padding:4px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Grotesk',sans-serif;}
-.score-opt.active{background:var(--green);color:var(--court);border-color:var(--green);}
-.game-card{background:var(--court);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.score-opt.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
+.game-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
 .game-card-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--border);}
 .game-num{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);}
-.game-status-done{font-size:10px;font-weight:700;color:var(--green);}
+.game-status-done{font-size:10px;font-weight:700;color:var(--up);}
 .game-status-pending{font-size:10px;font-weight:700;color:var(--yellow);}
 .game-score-body{display:grid;grid-template-columns:1fr auto 1fr;}
 .pair-col{display:flex;flex-direction:column;align-items:center;padding:12px 8px;gap:6px;cursor:pointer;transition:background .15s;}
-.pair-col:hover{background:var(--green-dim);}
-.pair-col.won{background:var(--green-dim);}
+.pair-col:hover{background:var(--accent-dim);}
+.pair-col.won{background:var(--up-dim);}
 .pair-col.lost{opacity:.4;}
 .pair-names-stacked{text-align:center;font-size:13px;font-weight:700;line-height:1.4;}
 .pair-amp{font-size:11px;color:var(--muted);font-weight:400;}
 .score-inputs{display:flex;align-items:center;gap:6px;margin-top:4px;}
 .score-input{width:48px;height:38px;text-align:center;background:var(--court-mid);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Space Mono',monospace;font-size:18px;font-weight:700;outline:none;}
-.score-input:focus{border-color:var(--green);}
-.score-input.winning{border-color:var(--green);color:var(--green);}
+.score-input:focus{border-color:var(--accent);}
+.score-input.winning{border-color:var(--up);color:var(--up);}
 .score-input.losing{border-color:var(--border);color:var(--muted);}
+.score-input.invalid{border-color:var(--red);color:var(--red);}
+.score-msg{font-size:11px;color:var(--red);text-align:center;line-height:1.4;padding:0 12px;}
+.score-msg:not(:empty){padding:0 12px 9px;}
+.score-opt:disabled{opacity:.35;cursor:not-allowed;}
 .vs-col{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 6px;background:var(--court-mid);border-left:1px solid var(--border);border-right:1px solid var(--border);}
 .vs-text{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);}
 .vs-score{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text);margin-top:4px;}
@@ -103,36 +194,38 @@ outline:none;cursor:pointer;flex-shrink:0;
 .sb-row:last-child{border-bottom:none;}
 .sb-rank{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);width:20px;}
 .sb-name{font-size:13px;font-weight:600;flex:1;}
-.sb-pts{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--green);}
+.sb-pts{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);}
 .sb-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;}
-.tag-up{background:var(--green-dim);color:var(--green);border:1px solid var(--green);}
+.tag-up{background:var(--up-dim);color:var(--up);border:1px solid var(--up);}
+.climber-mark{font-size:11px;color:var(--up);font-weight:700;cursor:help;}
 .tag-down{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
 .section-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .add-form{display:flex;gap:8px;margin-bottom:16px;}
 .add-input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;outline:none;}
-.add-input:focus{border-color:var(--green);}
+.add-input:focus{border-color:var(--accent);}
 .add-input::placeholder{color:var(--muted);}
-.add-btn{background:var(--green);color:var(--court);border:none;padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.add-btn{background:var(--accent);color:var(--on-accent);border:none;padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
 .btn{padding:10px 16px;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;}
-.btn-primary{background:var(--green);color:var(--court);}
+.btn-primary{background:var(--accent);color:var(--on-accent);}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;}
 .btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
+.btn-danger:disabled{opacity:.35;cursor:not-allowed;}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:center;justify-content:center;padding:14px;}
+.modal-bg{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:center;justify-content:center;padding:14px;}
 .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:4px;}
 .modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
 .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-top:-4px;}
 .team-choice{display:flex;width:100%;align-items:center;gap:12px;text-align:left;background:var(--court-mid);border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:8px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:background .15s,border-color .15s;}
-.team-choice:hover,.team-choice.current{background:var(--green-dim);border-color:var(--green);}
+.team-choice:hover,.team-choice.current{background:var(--accent-dim);border-color:var(--accent);}
 .team-choice-name{font-size:14px;font-weight:700;flex:1;}
 .team-choice-role{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
-.team-choice.current .team-choice-role{color:var(--green);}
+.team-choice.current .team-choice-role{color:var(--accent);}
 .profile-wrap{position:relative;}
-.profile-popover{position:absolute;top:calc(100% + 9px);right:0;width:310px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:0 18px 42px rgba(0,0,0,.42);z-index:110;}
+.profile-popover{position:absolute;top:calc(100% + 9px);right:0;width:310px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:0 18px 42px var(--shadow);z-index:110;}
 .profile-summary{display:flex;align-items:center;gap:10px;padding:7px 7px 13px;}
-.profile-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--green-dim);border:1px solid var(--green);color:var(--green);font-weight:700;font-family:'Space Mono',monospace;}
+.profile-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);font-weight:700;font-family:'Space Mono',monospace;}
 .profile-email{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;}
 .profile-role{font-size:10px;color:var(--muted);margin-top:2px;}
 .profile-action{display:flex;width:100%;align-items:center;gap:10px;text-align:left;background:transparent;border:0;border-radius:8px;padding:10px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;}
@@ -144,7 +237,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .profile-action.danger{color:var(--red);}
 .profile-team-option{display:flex;width:100%;align-items:center;gap:9px;text-align:left;background:transparent;border:1px solid transparent;border-radius:8px;padding:10px;color:var(--text);font-family:'Space Grotesk',sans-serif;cursor:pointer;}
 .profile-team-option:hover,.profile-team-option.current{background:var(--court-mid);border-color:var(--border);}
-.profile-team-option.current{border-color:var(--green);}
+.profile-team-option.current{border-color:var(--accent);}
 .profile-team-name{font-size:13px;font-weight:700;flex:1;}
 .profile-team-role{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;}
 .admin-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:2px 0 18px;}
@@ -153,7 +246,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .admin-list{padding:6px 16px;}
 .admin-list-head{display:flex;justify-content:space-between;padding:12px 2px 9px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;}
 .admin-team-row{display:flex;width:100%;align-items:center;gap:12px;background:transparent;border:0;border-top:1px solid var(--border);padding:14px 2px;color:var(--text);text-align:left;font-family:'Space Grotesk',sans-serif;cursor:pointer;}
-.admin-team-row:hover .admin-team-name{color:var(--green);}
+.admin-team-row:hover .admin-team-name{color:var(--accent);}
 .admin-team-icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--court-mid);border:1px solid var(--border);font-size:16px;}
 .admin-team-name{font-size:14px;font-weight:700;transition:color .15s;}
 .admin-team-meta{font-size:11px;color:var(--muted);margin-top:2px;}
@@ -163,25 +256,25 @@ outline:none;cursor:pointer;flex-shrink:0;
 .admin-team-accordion summary::-webkit-details-marker{display:none;}
 .admin-team-accordion .admin-team-row{border-top:0;}
 .admin-team-accordion[open] .admin-team-row{background:var(--court-mid);}
-.admin-team-accordion[open] .admin-team-arrow{color:var(--green);transform:rotate(90deg);}
+.admin-team-accordion[open] .admin-team-arrow{color:var(--accent);transform:rotate(90deg);}
 .admin-team-expanded{padding:2px 14px 16px 48px;background:var(--court-mid);border-top:1px solid var(--border);}
 .admin-team-expanded .manager-section{margin-top:12px;}
 .admin-form-label{display:block;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin:16px 0 7px;}
 .admin-account{background:var(--court-mid);border:1px solid var(--border);border-radius:9px;padding:12px;margin-top:8px;}
 .team-manager-dialog{max-width:560px!important;padding:0;overflow:hidden;}
 .team-manager-head{padding:20px 22px 18px;background:linear-gradient(135deg,var(--court-mid),var(--card));border-bottom:1px solid var(--border);}
-.team-manager-kicker{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:7px;}
+.team-manager-kicker{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:7px;}
 .team-manager-title{font-size:20px;font-weight:700;letter-spacing:-.3px;padding-right:26px;}
 .team-manager-copy{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;}
 .team-manager-body{padding:20px 22px 22px;}
-.manager-section{border:1px solid var(--border);border-radius:11px;padding:15px;margin-top:14px;background:rgba(20,41,24,.45);}
+.manager-section{border:1px solid var(--border);border-radius:11px;padding:15px;margin-top:14px;background:color-mix(in srgb,var(--court-mid) 60%,transparent);}
 .manager-section:first-child{margin-top:0;}
 .manager-section-title{font-size:13px;font-weight:700;margin-bottom:3px;}
 .manager-section-copy{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:12px;}
-.manager-account-card{background:var(--court);border:1px solid var(--border);border-radius:9px;padding:13px;margin-top:10px;}
+.manager-account-card{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:13px;margin-top:10px;}
 .manager-account-top{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:11px;}
-.manager-account-badge{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--green-dim);color:var(--green);font-size:12px;}
-.manager-accordion{border:1px solid var(--border);border-radius:11px;background:rgba(20,41,24,.45);margin-top:11px;overflow:hidden;}
+.manager-account-badge{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--accent-dim);color:var(--accent);font-size:12px;}
+.manager-accordion{border:1px solid var(--border);border-radius:11px;background:color-mix(in srgb,var(--court-mid) 60%,transparent);margin-top:11px;overflow:hidden;}
 .manager-accordion summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;}
 .manager-accordion summary::-webkit-details-marker{display:none;}
 .manager-accordion summary::after{content:'⌄';font-size:16px;color:var(--muted);transition:transform .15s;}
@@ -192,20 +285,20 @@ outline:none;cursor:pointer;flex-shrink:0;
 .manager-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;background:var(--court-mid);border-top:1px solid var(--border);}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:14px;}
 .player-check{background:var(--court-mid);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
-.player-check.attending{border-color:var(--green);background:var(--green-dim);}
+.player-check.attending{border-color:var(--accent);background:var(--accent-dim);}
 .check-name{font-size:13px;font-weight:600;}
 .check-rank{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;}
 .history-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
 .history-date{font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:var(--court);padding:10px 22px;border-radius:8px;font-weight:700;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--on-accent);padding:10px 22px;border-radius:8px;font-weight:700;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
 .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px;line-height:1.7;}
 .empty-icon{font-size:36px;margin-bottom:10px;}
 hr.div{border:none;border-top:1px solid var(--border);margin:10px 0;}
 /* Read-only viewers: hide every editing control (the database enforces this too) */
-body.viewer #new-session-btn,body.viewer .tab[data-tab="players"],body.viewer .tab[data-tab="members"],body.viewer .tab[data-tab="settings"],body.viewer .session-panel .btn-row,body.viewer .pill-remove,body.viewer .edit-btn,body.viewer #del-latest-btn,body.viewer .remove-btn{display:none!important;}
+body.viewer #new-session-btn,body.viewer .tab[data-tab="players"],body.viewer .tab[data-tab="members"],body.viewer .tab[data-tab="settings"],body.viewer .session-panel .btn-row,body.viewer .more-menu,body.viewer .pill-remove,body.viewer .edit-btn,body.viewer #del-latest-btn,body.viewer .remove-btn{display:none!important;}
 body.viewer .score-input,body.viewer .rank-edit-input,body.viewer .score-opt,body.viewer .pair-col{pointer-events:none;}
-body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer #cancel-session-btn,body.scorer #remove-round-btn,body.scorer #finalise-btn,body.scorer #advance-round-btn,body.scorer .max-score-row{display:none!important;}
+body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer .more-menu,body.scorer #finalise-btn,body.scorer #advance-round-btn,body.scorer .max-score-row{display:none!important;}
 body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 </style>
 </head>
@@ -274,6 +367,7 @@ function ensureSessionIds(){S.sessions.forEach((s,i)=>{if(!s.id)s.id='s'+Date.no
 // Last-chance save when the tab is hidden or closed. A normal request would be cancelled with the
 // page, so this uses fetch({keepalive:true}) straight to the same push_state function.
 function flushOnHide(){
+flushScoreDrafts(); // a score typed just before hiding is still waiting on its pause timer
 if(!CLOUD||!CAN_EDIT||!TOKEN||!localStorage.getItem(DIRTY_KEY))return;
 clearTimeout(syncTimer);
 const seq=saveSeq;
@@ -293,7 +387,7 @@ syncStatus={state,msg};
 const b=document.getElementById('live-badge');
 if(b){
 b.textContent=!CLOUD?'':state==='synced'?'● Live':state==='syncing'?'● Saving…':state==='error'?'● Offline':'';
-b.style.color=state==='synced'?'var(--green)':state==='syncing'?'var(--yellow)':'var(--red)';
+b.style.color=state==='synced'?'var(--up)':state==='syncing'?'var(--yellow)':'var(--red)';
 }
 if(currentTab==='settings')renderSettings();
 }
@@ -371,10 +465,10 @@ else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')setSyn
 // ── Sign-in & start-up ────────────────────────────────────────────────
 async function startApp(){
 const{data:{session}}=await SB.auth.getSession();
-if(!session){showLoginGate();return;}
+if(!session){showLoginGate(linkError);linkError='';return;}
 USER=session.user;TOKEN=session.access_token;
 const{data:teams,error:teamError}=await SB.rpc('list_accessible_teams');
-if(teamError||!teams||!teams.length){showNoTeamGate(teamError?.message);return;}
+if(teamError||!teams||!teams.length){showNoTeamGate(teamError?.message||linkError);linkError='';return;}
 TEAMS=teams;
 const remembered=localStorage.getItem('smash_current_team');
 CURRENT_TEAM=TEAMS.find(t=>t.team_id===remembered)||TEAMS[0];
@@ -430,22 +524,56 @@ const old=el('profile-menu');if(old)old.remove();
 const roleLabel=CURRENT_TEAM?.app_role==='platform_admin'?'Platform Admin':CURRENT_TEAM?.app_role==='team_admin'?'Team Admin':CURRENT_TEAM?.app_role==='scorer'?'Scoring User':'Viewer';
 const m=document.createElement('div');m.className='profile-popover';m.id='profile-menu';
 const action=(id,icon,label,meta,extra='')=>'<button class="profile-action '+extra+'" id="'+id+'"><span class="profile-action-icon">'+icon+'</span><span class="profile-action-label">'+label+'</span><span class="profile-action-meta">'+meta+'</span></button>';
-let actions=action('profile-teams','🏸','Teams','Switch');
+let actions=action('profile-teams','🏸','Teams','Switch')+action('profile-theme','🎨','Theme',THEMES.find(x=>x.id===themePref().t).name);
 if(CURRENT_TEAM?.app_role==='platform_admin')actions+=action('profile-admin','🛡️','Admin','Platform');
 if(CAN_EDIT)actions+=action('profile-settings','⚙️','Settings','Team');
 actions+='<div class="profile-divider"></div>'+action('profile-logout','↪','Log out','Account','danger');
-const email=USER?.email||'—';
+const email=USER?.email||(USER?.is_anonymous?'Guest viewer':'—');
 m.innerHTML='<div class="profile-summary"><div class="profile-avatar">'+esc(email.charAt(0).toUpperCase())+'</div><div><div class="profile-email">'+esc(email)+'</div><div class="profile-role">'+roleLabel+'</div></div></div><div class="profile-divider"></div>'+actions;
 el('profile-wrap').appendChild(m);
 let onOutside;
 const close=()=>{m.remove();if(onOutside)document.removeEventListener('click',onOutside);};
 m.closeProfilePopover=close;
 el('profile-teams').addEventListener('click',e=>{e.stopPropagation();showTeamsInProfile(m);});
+el('profile-theme').addEventListener('click',e=>{e.stopPropagation();showThemeInProfile(m);});
 if(el('profile-admin'))el('profile-admin').addEventListener('click',()=>{close();showTab('admin');});
 if(el('profile-settings'))el('profile-settings').addEventListener('click',()=>{close();showTab('settings');});
 el('profile-logout').addEventListener('click',()=>{close();logout();});
 onOutside=e=>{if(!el('profile-wrap')?.contains(e.target))close();};
 setTimeout(()=>{if(el('profile-menu')===m)document.addEventListener('click',onOutside);},0);
+}
+// ── Theme (per device) ────────────────────────────────────────────────
+const THEMES=[
+{id:'court',name:'Court green',sw:['#15803d','#4ade80']},
+{id:'night',name:'Night match',sw:['#1d3a8a','#d4f542']},
+{id:'indigo',name:'Arena indigo',sw:['#5b47d6','#a99bff']},
+{id:'clay',name:'Clay court',sw:['#b8501c','#f08a4b']}
+];
+const themeMemory={}; // fallback when this browser blocks storage
+function themePref(){
+let t=themeMemory.smash_theme||'court',m=themeMemory.smash_mode||'system';
+try{t=localStorage.getItem('smash_theme')||t;m=localStorage.getItem('smash_mode')||m;}catch(e){}
+if(!THEMES.some(x=>x.id===t))t='court';
+return{t,m};
+}
+const lightQuery=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){
+const{t,m}=themePref(),d=document.documentElement;
+d.dataset.theme=t;
+d.dataset.mode=m==='system'?(lightQuery.matches?'light':'dark'):m;
+}
+lightQuery.addEventListener('change',applyTheme); // "System" follows the OS as it switches
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyTheme();}); // in case the switch happened while hidden
+function setThemePref(key,val){themeMemory[key]=val;try{localStorage.setItem(key,val);}catch(e){}applyTheme();}
+function showThemeInProfile(m){
+const{t,m:mode}=themePref();
+m.innerHTML='<button class="profile-action" id="profile-back"><span class="profile-action-icon">←</span><span class="profile-action-label">Theme</span></button><div class="profile-divider"></div>'
++'<div class="theme-mode">'+[['system','System'],['light','☀️ Light'],['dark','🌙 Dark']].map(([v,l])=>'<button class="score-opt'+(mode===v?' active':'')+'" data-mode-opt="'+v+'">'+l+'</button>').join('')+'</div>'
++THEMES.map(x=>'<button class="profile-team-option'+(x.id===t?' current':'')+'" data-theme-opt="'+x.id+'"><span class="theme-swatch" style="background:linear-gradient(135deg,'+x.sw[0]+' 50%,'+x.sw[1]+' 50%);"></span><span class="profile-team-name">'+x.name+'</span><span class="profile-team-role">'+(x.id===t?'Current':'')+'</span></button>').join('');
+// stopPropagation: the menu is re-rendered, so the outside-click check would no longer find the target
+el('profile-back').addEventListener('click',e=>{e.stopPropagation();m.closeProfilePopover?.();showProfileMenu();});
+m.querySelectorAll('[data-mode-opt]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();setThemePref('smash_mode',b.dataset.modeOpt);showThemeInProfile(m);}));
+m.querySelectorAll('[data-theme-opt]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();setThemePref('smash_theme',b.dataset.themeOpt);showThemeInProfile(m);}));
 }
 function showTeamsInProfile(m){
 if(!m||!TEAMS.length)return;
@@ -458,22 +586,27 @@ m.querySelectorAll('[data-profile-team-id]').forEach(btn=>btn.addEventListener('
 function showNoTeamGate(msg){
 closeLoginGate();
 const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
-m.innerHTML='<div class="modal"><div class="modal-title">No team access</div><div class="modal-sub">Use a team name and passcode to enter as a viewer.</div>'+(msg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(msg)+'</div>':'')+'<button class="btn btn-primary" id="viewer-entry-btn">Enter a team</button></div>';
-document.body.appendChild(m);el('viewer-entry-btn').addEventListener('click',showViewerGate);
+m.innerHTML='<div class="modal"><div class="modal-title">No team access</div><div class="modal-sub">To watch a team\'s ladder, open the share link from its team admin. Players with an account can sign in instead.</div>'+(msg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(msg)+'</div>':'')+'<button class="btn btn-outline" id="account-signin-btn">Sign in with an account</button></div>';
+document.body.appendChild(m);el('account-signin-btn').addEventListener('click',()=>{closeLoginGate();logout();});
 }
-function showViewerGate(){
-closeLoginGate();
-const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
-m.innerHTML='<div class="modal"><div class="modal-title">View a team</div><div class="modal-sub">Enter the shared team passcode.</div><input class="add-input" id="viewer-team" placeholder="Team name" style="margin-bottom:8px;width:100%;"><input class="add-input" id="viewer-email" type="email" placeholder="Your email" style="margin-bottom:8px;width:100%;"><input class="add-input" id="viewer-code" placeholder="Team passcode" style="margin-bottom:14px;width:100%;"><div class="btn-row"><button class="btn btn-primary" id="viewer-enter-btn">View ladder</button></div><div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div></div>';
-document.body.appendChild(m);
-el('viewer-enter-btn').addEventListener('click',async()=>{
-const team=el('viewer-team').value.trim(),email=el('viewer-email').value.trim(),code=el('viewer-code').value.trim();
-if(!team||!email||!code)return;
-let{data:{session}}=await SB.auth.getSession();
-if(!session){const r=await SB.auth.signInAnonymously();if(r.error){el('login-err').textContent=r.error.message;return;}}
-const{error}=await SB.rpc('enter_team_as_viewer',{p_team_name:team,p_passcode:code,p_email:email});
-if(error){el('login-err').textContent=error.message;return;}closeLoginGate();await startApp();
-});
+// A share link (?join=<token>) makes this visitor a viewer of that team: sign in anonymously if
+// needed, register the access, and open that team. The token is taken out of the address bar
+// straight away so it isn't bookmarked or copied along with the page URL.
+let linkError='';
+async function joinFromShareLink(){
+const params=new URLSearchParams(location.search);
+const token=params.get('join');
+if(!token)return;
+params.delete('join');
+history.replaceState(null,'',location.pathname+(params.toString()?'?'+params:'')+location.hash);
+const{data:{session}}=await SB.auth.getSession();
+if(!session){
+const r=await SB.auth.signInAnonymously();
+if(r.error){linkError='Could not open the share link: '+r.error.message;return;}
+}
+const{data:teamId,error}=await SB.rpc('enter_team_by_link',{p_token:token});
+if(error){linkError=error.message;return;}
+localStorage.setItem('smash_current_team',teamId);
 }
 function showLoginGate(errMsg){
 closeLoginGate();
@@ -483,8 +616,9 @@ m.innerHTML='<div class="modal"><div class="modal-title">🔒 Sign in</div><div 
 +(errMsg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(errMsg)+'</div>':'')
 +'<input class="add-input" id="login-email" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px;width:100%;">'
 +'<input class="add-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password" style="margin-bottom:14px;width:100%;">'
-+'<div class="btn-row"><button class="btn btn-primary" id="login-btn">Sign in</button><button class="btn btn-outline" id="viewer-btn">View with team passcode</button></div>'
-+'<div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div></div>';
++'<div class="btn-row"><button class="btn btn-primary" id="login-btn">Sign in</button></div>'
++'<div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div>'
++'<div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.5;">Just want to watch? Open the share link from your team admin — no account needed.</div></div>';
 document.body.appendChild(m);
 const tryLogin=async()=>{
 const email=el('login-email').value.trim(),password=el('login-pass').value;
@@ -498,7 +632,6 @@ await startApp();
 toast('Signed in');
 };
 el('login-btn').addEventListener('click',tryLogin);
-el('viewer-btn').addEventListener('click',showViewerGate);
 el('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin();});
 }
 function closeLoginGate(){const m=el('login-gate');if(m)m.remove();}
@@ -518,11 +651,7 @@ render();
 showLoginGate();
 }
 
-// pending remove state
-let pendingRemovePlayer=null; // player id
-let pendingRemoveSession=null; // {ci, pid}
-let pendingRemoveRound=false; // confirm banner for "Remove Round N"
-let pendingDeleteSession=false; // confirm banner for deleting the latest history session
+let sessionMoreOpen=false; // "⋯ More options" on the session panel stays open across re-renders
 let adminDirectory=[];
 
 // ── Tabs ──────────────────────────────────────────────────────────────
@@ -538,10 +667,7 @@ currentTab=t;
 document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
 ['ladder','session','history','players','members','admin','settings'].forEach(x=>
 document.getElementById('tab-'+x).style.display=x===t?'':'none');
-pendingRemovePlayer=null;
-pendingRemoveSession=null;
-pendingRemoveRound=false;
-pendingDeleteSession=false;
+sessionMoreOpen=false;
 render();
 }
 function render(){
@@ -564,21 +690,94 @@ setTimeout(()=>t.classList.remove('show'),2500);
 }
 function el(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Confirmation dialog. With `confirmWord` it is the two-step check every deletion goes through:
+// the dialog spells out the impact (step 1), and the red button stays disabled until the word is
+// typed (step 2). Without it, it is a plain one-step "are you sure" with a primary button.
+// `body` is HTML — callers escape any names they put in it.
+function confirmDialog({title,body,confirmWord,confirmLabel,cancelLabel='Keep it',onConfirm}){
+const old=el('danger-modal');if(old)old.remove();
+const m=document.createElement('div');m.className='modal-bg';m.id='danger-modal';
+m.innerHTML='<div class="modal"><button class="modal-close" id="danger-close" aria-label="Close">✕</button><div class="modal-title">'+esc(title)+'</div>'
++(confirmWord
+?'<div class="danger-impact">'+body+'</div>'
++'<label class="admin-form-label" for="danger-input">Type <span class="danger-word">'+esc(confirmWord)+'</span> to confirm</label>'
++'<input class="add-input" id="danger-input" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;">'
+:'<div class="modal-sub" style="font-size:13px;line-height:1.55;">'+body+'</div>')
++'<div class="btn-row"><button class="btn '+(confirmWord?'btn-danger':'btn-primary')+'" id="danger-confirm"'+(confirmWord?' disabled':'')+'>'+esc(confirmLabel)+'</button><button class="btn btn-outline" id="danger-cancel">'+esc(cancelLabel)+'</button></div></div>';
+document.body.appendChild(m);
+const btn=el('danger-confirm');
+const close=()=>m.remove();
+btn.addEventListener('click',()=>{close();onConfirm();});
+el('danger-close').addEventListener('click',close);
+el('danger-cancel').addEventListener('click',close);
+m.addEventListener('click',e=>{if(e.target===m)close();});
+if(!confirmWord){btn.focus();return;}
+const norm=v=>v.trim().replace(/\s+/g,' ').toLowerCase();
+const inp=el('danger-input');
+inp.addEventListener('input',()=>{btn.disabled=norm(inp.value)!==norm(confirmWord);});
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!btn.disabled)btn.click();});
+inp.focus();
+}
 
 // ── Ladder ────────────────────────────────────────────────────────────
+// The ladder after each of the last `n` sessions, oldest first: [{s, after:{id:rank}, delta:{id:±n}, exact}].
+// Sessions finalised with a rank snapshot are exact. Older ones are rebuilt by walking back from the
+// next known ladder with that session's rank changes — approximate if ranks were edited by hand or
+// players were added/removed in between.
+function ladderHistory(n){
+const idByName={};S.players.forEach(p=>idByName[p.name]=p.id);
+let known={};S.players.forEach(p=>known[p.id]=p.rank); // ladder after the session being looked at
+const out=[];
+for(let k=S.sessions.length-1;k>=0&&out.length<n;k--){
+const s=S.sessions[k];
+const after=s.ranksAfter||known;
+const delta={};(s.rankChanges||[]).forEach(r=>{const id=idByName[r.name];if(id!==undefined)delta[id]=r.delta;});
+out.unshift({s,after,delta,exact:!!s.ranksAfter});
+const before={};Object.keys(after).forEach(id=>before[id]=after[id]+(delta[id]||0));
+known=before;
+}
+return out;
+}
+// Wins, losses and points per player across every round of a session
+function sessionPlayerStats(s){
+const st={};
+(s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts||[]}]).forEach(r=>(r.courts||[]).forEach(c=>c.games.forEach(g=>{
+if(g.s1===null||g.s2===null)return;
+const add=(ids,pts,won)=>ids.forEach(id=>{const x=st[id]||(st[id]={w:0,l:0,pts:0});x.pts+=pts;won?x.w++:x.l++;});
+add(g.pair1,g.s1,g.s1>g.s2);add(g.pair2,g.s2,g.s2>g.s1);
+})));
+return st;
+}
+function shortDate(d){const[day,mon]=String(d).split(' ');return mon?day+' '+mon.slice(0,3):String(d);}
 function renderLadder(){
 const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const root=el('tab-ladder');
 if(!sorted.length){root.innerHTML='<div class="empty"><div class="empty-icon">🏸</div>No players yet.<br>Add players in the Players tab.</div>';return;}
-let h='<div class="section-label">'+sorted.length+' players ranked</div>';
+const hist=ladderHistory(5);
+const stats=hist.map(c=>sessionPlayerStats(c.s));
+const cols='grid-template-columns:34px minmax(0,1fr)'+(hist.length?' repeat('+hist.length+',30px)':' auto')+';';
+let h='<div class="ladder-head" style="'+cols+'"><span></span><span class="section-label" style="margin:0;">'+sorted.length+' players ranked</span>'
++hist.map(c=>'<span class="lh-date" title="'+esc(c.s.date)+(c.exact?'':' — rebuilt from rank changes, may be approximate')+'">'+esc(shortDate(c.s.date))+(c.exact?'':'≈')+'</span>').join('')+'</div>';
 sorted.forEach(p=>{
 const ac=p.rank===1?'gold':p.rank===2?'silver':p.rank===3?'bronze':'';
 const rc=p.rank===1?'rank-gold':p.rank===2?'rank-silver':p.rank===3?'rank-bronze':'';
-const d=p.rankDelta||0;
-const dh=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta delta-down">▼'+Math.abs(d)+'</span>':'<span class="delta delta-none">—</span>';
 const wr=(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):0;
-h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row"><div class="rank-num">'+p.rank+'</div><div><div class="player-name">'+p.name+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+dh+'</div></div>';
+let tail;
+if(hist.length){
+tail=hist.map((c,i)=>{
+const r=c.after[p.id];
+if(r===undefined)return'<span class="lh-cell none" title="'+esc(c.s.date)+': not on the ladder yet"></span>';
+const d=c.delta[p.id]||0,absent=(c.s.skipped||[]).includes(p.id),st=stats[i][p.id];
+const tip=c.s.date+': #'+r+(d>0?' (▲'+d+')':d<0?' (▼'+(-d)+')':'')+(absent?' · absent (−2)':st?' · '+st.w+'W '+st.l+'L · '+st.pts+' pts':'');
+return'<span class="lh-cell'+(d>0?' up':d<0?' down':'')+(absent?' absent':'')+'" title="'+esc(tip)+'">'+r+'</span>';
+}).join('');
+}else{
+const d=p.rankDelta||0;
+tail=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta delta-down">▼'+Math.abs(d)+'</span>':'<span class="delta delta-none">—</span>';
+}
+h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row ladder-row" style="'+cols+'"><div class="rank-num">'+p.rank+'</div><div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+tail+'</div></div>';
 });
+if(hist.length)h+='<div class="lh-legend"><span class="lh-cell up">3</span> climbed <span class="lh-cell down">5</span> dropped <span class="lh-cell absent">7</span> absent (−2) · rank after each of the last '+hist.length+' session'+(hist.length>1?'s':'')+', oldest → newest</div>';
 root.innerHTML=h;
 }
 
@@ -592,15 +791,8 @@ h+='<div class="card" style="margin-bottom:14px;"><div class="section-label" sty
 +'<div class="btn-row" style="margin-top:10px;"><button class="btn btn-primary" id="bulk-add-btn">Add All</button></div></div>';
 h+='<div class="section-label" style="margin-bottom:6px;">'+sorted.length+' players — tap rank number to edit</div>';
 
-if(pendingRemovePlayer!==null){
-const pp=gp(pendingRemovePlayer);
-h+='<div class="confirm-banner"><span class="confirm-banner-msg">Remove <strong>'+(pp?pp.name:'player')+'</strong> from the ladder?</span>'
-+'<div class="confirm-banner-btns"><button class="cbtn-yes" id="confirm-yes-btn">Remove</button><button class="cbtn-no" id="confirm-no-btn">Cancel</button></div></div>';
-}
-
 sorted.forEach(p=>{
-const isTarget=pendingRemovePlayer===p.id;
-h+='<div class="card" style="'+(isTarget?'border-color:var(--red);':'')+'"><div class="player-row">'
+h+='<div class="card"><div class="player-row">'
 +'<input class="rank-edit-input" data-pid="'+p.id+'" value="'+p.rank+'" type="number" min="1" max="'+S.players.length+'" title="Edit rank">'
 +'<div><div class="player-name">'+p.name+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts</div></div>'
 +'<button class="remove-btn" data-pid="'+p.id+'">✕</button>'
@@ -617,11 +809,6 @@ btn.addEventListener('click',()=>{
 showRemovePlayerConfirmation(Number(btn.dataset.pid));
 });
 });
-
-if(pendingRemovePlayer!==null){
-el('confirm-yes-btn').addEventListener('click',()=>doRemovePlayer(pendingRemovePlayer));
-el('confirm-no-btn').addEventListener('click',()=>{pendingRemovePlayer=null;renderPlayers();});
-}
 
 root.querySelectorAll('.rank-edit-input').forEach(inp=>{
 const apply=()=>{
@@ -661,20 +848,17 @@ id=Number(id);
 const p=gp(id);const name=p?p.name:'Player';
 S.players=S.players.filter(x=>x.id!==id);
 S.players.sort((a,b)=>a.rank-b.rank).forEach((x,i)=>x.rank=i+1);
-pendingRemovePlayer=null;
 save();render();toast(name+' removed from ladder');
 }
 
 function showRemovePlayerConfirmation(id){
 const player=gp(id);if(!player)return;
-const m=document.createElement('div');m.className='modal-bg';m.id='remove-player-modal';
-m.innerHTML='<div class="modal"><button class="modal-close" id="remove-player-close" aria-label="Close">✕</button><div class="modal-title">Remove player?</div><div class="modal-sub">⚠️ You are about to remove <strong style="color:var(--text);">'+esc(player.name)+'</strong> from this ladder. This action cannot be undone.</div><div class="btn-row"><button class="btn btn-danger" id="remove-player-confirm">Remove player</button><button class="btn btn-outline" id="remove-player-cancel">Keep player</button></div></div>';
-document.body.appendChild(m);
-const close=()=>m.remove();
-el('remove-player-close').addEventListener('click',close);
-el('remove-player-cancel').addEventListener('click',close);
-el('remove-player-confirm').addEventListener('click',()=>{close();doRemovePlayer(id);});
-m.addEventListener('click',e=>{if(e.target===m)close();});
+confirmDialog({
+title:'Remove player?',
+body:'<strong>'+esc(player.name)+'</strong> (#'+player.rank+') will be removed from this ladder, and everyone below moves up one place. This cannot be undone.',
+confirmWord:player.name,confirmLabel:'Remove player',cancelLabel:'Keep player',
+onConfirm:()=>{if(gp(id))doRemovePlayer(id);}
+});
 }
 
 
@@ -698,12 +882,12 @@ save();renderPlayers();toast(target.name+' moved to #'+newRank);
 }
 
 // ── Session setup ─────────────────────────────────────────────────────
-let setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+let setup={attending:new Set(),numCourts:2,rankBasis:'wins',splitMode:'auto',customSizes:[]};
 function openSessionModal(){
 if(!CAN_EDIT){toast('View-only account');return;}
 if(S.activeSession){toast('Finish the active session first');showTab('session');return;}
 if(S.players.length<4){toast('Add at least 4 players first');return;}
-setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+setup={attending:new Set(),numCourts:2,rankBasis:'wins',splitMode:'auto',customSizes:[]};
 buildModal();
 }
 function buildModal(){
@@ -711,8 +895,8 @@ const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
-let rb=[{v:'points',l:'Points'},{v:'wins',l:'Wins then Points'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div><div class="section-label" style="margin-bottom:7px;">Number of Rounds</div><input type="number" id="rounds-input" class="add-input" style="max-width:90px;" min="1" max="10" value="'+setup.numRounds+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+let rb=[{v:'wins',l:'Wins then Points'},{v:'points',l:'Points only'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
@@ -725,10 +909,6 @@ updatePreview();
 el('courts-input').addEventListener('input',()=>{
 setup.numCourts=Math.max(1,parseInt(el('courts-input').value)||1);
 renderCustomSizes();updatePreview();
-});
-el('rounds-input').addEventListener('input',()=>{
-setup.numRounds=Math.max(1,parseInt(el('rounds-input').value)||1);
-updatePreview();
 });
 m.querySelectorAll('[data-rankbasis]').forEach(b=>{
 b.addEventListener('click',()=>{
@@ -785,7 +965,7 @@ const pv=el('modal-preview');if(!pv)return;
 const sizes=sessionSizes();
 const err=sizesError(n,sizes);
 if(err){pv.textContent=err;return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · starts with Round 1 · ranked by '+(setup.rankBasis==='wins'?'wins, then points':'points only');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
@@ -865,10 +1045,11 @@ const sizes=sessionSizes();
 const err=sizesError(att.length,sizes);
 if(err){toast(err);return;}
 const courts=buildCourts(att,sizes);
+scoreDrafts={};scoreErrors={};
 const bands=courts.map(c=>c.players.map(id=>gp(id).rank).sort((a,b)=>a-b));
 S.activeSession={
 date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
-numRounds:setup.numRounds,
+numRounds:1, // grows as rounds are added; always equals round
 rankBasis:setup.rankBasis,
 round:1,
 bands:bands,
@@ -880,7 +1061,118 @@ attending:att
 save();closeModal();showTab('session');toast('Session started! 🏸');
 }
 
+// ── Score entry ───────────────────────────────────────────────────────
+// Each court plays to its game length (15 or 21). By default the game ends there — 21–20 is a
+// finished game. With deuce on (court.deuce), at (length−1)-all play goes on until one side is 2
+// clear, up to a cap where the next point wins (29-all → 30 for 21-point games, 20-all → 21 for 15).
+const SCORE_CAPS={15:21,21:30};
+function scoreCap(max,deuce){return deuce?SCORE_CAPS[max]||max+9:max;}
+// Why s1–s2 can't be a finished game under this court's rules, or null when it can.
+function scoreError(s1,s2,max,deuce){
+const cap=scoreCap(max,deuce),w=Math.max(s1,s2),l=Math.min(s1,s2);
+if(w===l)return'A game can\'t end level.';
+if(!deuce){
+if(w!==max)return'Games on this court end at exactly '+max+' (deuce is off).';
+return null;
+}
+if(w>cap)return'Scores stop at '+cap+' — at '+(cap-1)+'-all the next point wins.';
+if(w<max)return'The winning side needs '+max+' points.';
+if(w===max&&l>max-2)return'At '+(max-1)+'-all play on until one side is 2 clear (e.g. '+(max+1)+'–'+(max-1)+').';
+if(w>max&&l!==w-2&&!(w===cap&&l===cap-1))return'Past '+max+' a game ends 2 clear (e.g. '+(max+2)+'–'+max+') or at '+cap+'–'+(cap-1)+'.';
+return null;
+}
+let courtTab=(()=>{try{return Number(localStorage.getItem('smash_court_tab'))||0;}catch(e){return 0;}})();
+let scoreDrafts={};   // typed-but-unsaved box values, keyed by gameKey()+'|'+pair
+let scoreErrors={};   // gameKey() -> why the typed score was rejected
+const scoreTimers={};
+let sessionRendering=false; // the session DOM is being replaced — ignore the blur that causes
+// Identifies a game by round, court and pairs, so drafts survive re-renders but never leak into
+// a different game after courts are rebuilt.
+function gameKey(s,ci,gi){const g=s.courts[ci].games[gi];return s.round+'|'+ci+'|'+g.pair1.join(',')+'v'+g.pair2.join(',');}
+function clearScoreDraft(gk){delete scoreDrafts[gk+'|1'];delete scoreDrafts[gk+'|2'];delete scoreErrors[gk];}
+function flushScoreDrafts(){
+Object.keys(scoreTimers).forEach(k=>{const[ci,gi]=k.split('-').map(Number);commitScore(ci,gi);});
+}
+function scheduleScoreCommit(ci,gi){
+const k=ci+'-'+gi;
+clearTimeout(scoreTimers[k]);
+scoreTimers[k]=setTimeout(()=>commitScore(ci,gi),1500);
+}
+// Committing a score re-renders the session. When the commit comes from leaving a box, wait until
+// the tap/click that moved focus has finished — otherwise the element being tapped is replaced
+// mid-click and the tap (or the focus it gives) is lost.
+let pointerIsDown=false,afterPointer=[];
+function afterInteraction(fn){if(pointerIsDown)afterPointer.push(fn);else setTimeout(fn,0);}
+document.addEventListener('pointerdown',()=>{pointerIsDown=true;},true);
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>{
+pointerIsDown=false;
+const fns=afterPointer;afterPointer=[];
+setTimeout(()=>fns.forEach(f=>f()),0); // runs after the click event has been dispatched
+},true));
+function rerenderSessionKeepingFocus(){
+if(currentTab!=='session')return;
+const a=document.activeElement,id=a&&a.id,ss=a&&a.selectionStart,se=a&&a.selectionEnd;
+renderSession();
+const r=id&&el(id);
+if(r&&r!==document.activeElement){r.focus();try{r.setSelectionRange(ss,se);}catch(e){}}
+}
+async function commitScore(ci,gi){
+clearTimeout(scoreTimers[ci+'-'+gi]);
+const s=S.activeSession,court=s&&s.courts[ci],game=court&&court.games[gi];
+if(!game)return;
+const gk=gameKey(s,ci,gi);
+const d1=scoreDrafts[gk+'|1'],d2=scoreDrafts[gk+'|2'];
+if(d1===undefined&&d2===undefined)return; // nothing typed
+const v1=d1!==undefined?d1:String(game.s1??''),v2=d2!==undefined?d2:String(game.s2??'');
+if(v1===''||v2==='')return; // wait for the other box
+const s1=Number(v1),s2=Number(v2);
+if(s1===game.s1&&s2===game.s2){clearScoreDraft(gk);return;}
+const err=scoreError(s1,s2,court.maxScore,court.deuce);
+if(err){scoreErrors[gk]=err;rerenderSessionKeepingFocus();return;}
+if(!CAN_EDIT&&CAN_SCORE){
+const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
+if(error){
+if(error.message?.startsWith('Score conflict:')){clearScoreDraft(gk);toast('Score conflict — latest score loaded.');await refreshFromCloud();return;}
+toast('Score not saved: '+error.message);return;
+}
+clearScoreDraft(gk);
+await refreshFromCloud();return;
+}
+game.s1=s1;game.s2=s2;
+clearScoreDraft(gk);
+save();rerenderSessionKeepingFocus();
+}
+
 // ── Session render ────────────────────────────────────────────────────
+// "Session so far": each finished round's final standings per court (newest first), with where
+// each player went next round; the game-by-game scores are tucked into a collapsible.
+function roundSummaryHtml(s){
+if(!s.rounds.length)return'';
+let h='<div class="section-label" style="margin-top:22px;">Session so far</div>';
+[...s.rounds].map((r,ri)=>({r,ri})).reverse().forEach(({r,ri})=>{
+const next=(s.rounds[ri+1]||{courts:s.courts}).courts;
+const courtOf={};next.forEach((c,ci)=>c.players.forEach(id=>courtOf[id]=ci));
+h+='<div class="card round-summary"><div class="round-summary-title">Round '+(ri+1)+' result</div>';
+r.courts.forEach((c,ci)=>{
+const{ranked,ptMap,winMap}=tallyCourt(c,s.rankBasis);
+h+='<div class="round-summary-court">Court '+(ci+1)+'</div>';
+ranked.forEach((id,i)=>{
+const to=courtOf[id];
+const tag=to===undefined||to===ci?'':to<ci?'<span class="sb-tag tag-up">▲ Court '+(to+1)+'</span>':'<span class="sb-tag tag-down">▼ Court '+(to+1)+'</span>';
+h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+'</span><span class="sb-pts">'+(s.rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
+});
+});
+h+='<details class="round-games"><summary>Game scores</summary>';
+r.courts.forEach((c,ci)=>{
+h+='<div style="font-size:12px;margin:8px 0 3px;"><strong>Court '+(ci+1)+'</strong></div>';
+c.games.forEach((g,gi)=>{
+h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>esc(nameOf(id))).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>esc(nameOf(id))).join(' & ')+(g.sitOut?' <em>(sitting: '+esc(sitOutNames(g))+')</em>':'')+'</div>';
+});
+});
+h+='</details></div>';
+});
+return h;
+}
 function renderSession(){
 const root=el('tab-session');
 if(!S.activeSession){
@@ -894,54 +1186,30 @@ const allDone=doneG===totalG;
 const pct=totalG?Math.round(doneG/totalG*100):0;
 
 let h='<div class="session-panel">'
-+'<div class="session-title">Session — '+s.date+' · Round '+s.round+' of '+s.numRounds+'</div>'
++'<div class="session-title">Session — '+s.date+' · Round '+s.round+'</div>'
 +'<div class="session-meta">'+s.courts.length+' court'+(s.courts.length>1?'s':'')+' · '+s.attending.length+' playing · '+doneG+'/'+totalG+' games scored</div>'
 +'<div class="progress-wrap"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
 
-// Pending remove banner for session
-if(pendingRemoveSession!==null){
-const {ci,pid}=pendingRemoveSession;
-h+='<div class="confirm-banner"><span class="confirm-banner-msg">Remove <strong>'+nameOf(pid)+'</strong> from Court '+(ci+1)+'? Their games will be cleared.</span>'
-+'<div class="confirm-banner-btns"><button class="cbtn-yes" id="sess-confirm-yes">Remove</button><button class="cbtn-no" id="sess-confirm-no">Cancel</button></div></div>';
-}
-
-// Pending "remove round" banner
-if(pendingRemoveRound&&s.numRounds>1){
-const inProgress=s.numRounds===s.round; // removing the round currently on the courts
-if(!inProgress){
-h+='<div class="confirm-banner neutral"><span class="confirm-banner-msg">Remove <strong>Round '+s.numRounds+'</strong>? It hasn\'t started yet — the session will finish after Round '+(s.numRounds-1)+'.</span>'
-+'<div class="confirm-banner-btns"><button class="cbtn-yes" id="round-confirm-yes">Remove</button><button class="cbtn-no" id="round-confirm-no">Cancel</button></div></div>';
-}else{
-const msg=doneG>0
-?'⚠ <strong>Round '+s.round+'</strong> is in progress ('+doneG+' of '+totalG+' games scored). Removing it will <strong>discard those scores</strong> and reopen Round '+(s.round-1)+' as the final round (its scores are kept).'
-:'<strong>Round '+s.round+'</strong> has no scores yet. Removing it will reopen Round '+(s.round-1)+' as the final round.';
-h+='<div class="confirm-banner"><span class="confirm-banner-msg">'+msg+'</span>'
-+'<div class="confirm-banner-btns"><button class="cbtn-yes" id="round-confirm-yes">'+(doneG>0?'Discard &amp; Remove':'Remove')+'</button><button class="cbtn-no" id="round-confirm-no">Cancel</button></div></div>';
-}
-}
-
-if(s.rounds.length){
-h+='<div class="section-label" style="margin-top:4px;">Previous Rounds</div>';
-s.rounds.forEach((r,ri)=>{
-h+='<div class="card" style="margin-bottom:10px;"><div style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:6px;">Round '+(ri+1)+'</div>';
-r.courts.forEach((c,ci)=>{
-if(ci>0)h+='<hr class="div">';
-h+='<div style="font-size:12px;margin-bottom:4px;"><strong>Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
-c.games.forEach((g,gi)=>{
-h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
-});
-});
-h+='</div>';
-});
+// One court at a time: each scorer stays on their own court's tab
+const selCourt=Math.min(courtTab,s.courts.length-1);
+if(s.courts.length>1){
+h+='<div class="court-tabs">'+s.courts.map((c,ci)=>{
+const d=c.games.filter(g=>g.s1!==null&&g.s2!==null).length,t=c.games.length,done=t>0&&d===t;
+return'<button class="court-tab'+(ci===selCourt?' active':'')+(done?' done':'')+'" data-court-tab="'+ci+'"><span>Court '+(ci+1)+'</span><span class="court-tab-prog">'+(done?'✓':d+'/'+t)+'</span></button>';
+}).join('')+'</div>';
 }
 
 s.courts.forEach((court,ci)=>{
-const{ranked,ptMap}=tallyCourt(court,s.rankBasis);
+if(ci!==selCourt)return;
+const{ranked,ptMap,winMap}=tallyCourt(court,s.rankBasis);
+const climbers=court.climbers||[];
 const numCourts=s.courts.length;
+const courtScored=court.games.some(g=>g.s1!==null&&g.s2!==null);
+const pastLength=court.games.some(g=>g.s1!==null&&g.s2!==null&&Math.max(g.s1,g.s2)>court.maxScore);
 
 h+='<div class="court-block">'
 +'<div class="court-hdr"><span class="court-lbl">🏸 Court '+(ci+1)+(ci===0&&numCourts>1?' (Top)':ci===numCourts-1&&numCourts>1?' (Bottom)':'')+'</span>'
-+'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games</span></div>';
++'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games · to '+court.maxScore+(court.deuce?' (deuce, max '+scoreCap(court.maxScore,true)+')':', no deuce')+'</span></div>';
 
 // Pills with remove buttons
 h+='<div class="court-pills">';
@@ -952,25 +1220,35 @@ h+='<span class="pill">'+nameOf(id)
 h+='</div>';
 
 h+='<div class="max-score-row">Max score: '
-+[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'">'+n+'</button>').join('')
++[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'"'+(courtScored&&court.maxScore!==n?' disabled title="Clear this court\'s scores to change the game length"':'')+'>'+n+'</button>').join('')
++'<span style="margin-left:10px;">Deuce:</span>'
++[{v:false,l:'Off'},{v:true,l:'On'}].map(o=>{
+const locked=!o.v&&court.deuce&&pastLength; // switching off would invalidate games already past the length
+return'<button class="score-opt'+(!!court.deuce===o.v?' active':'')+'" data-ci="'+ci+'" data-deuce="'+(o.v?1:0)+'"'+(locked?' disabled title="A game on this court went past '+court.maxScore+'"':'')+'>'+o.l+'</button>';
+}).join('')
 +'</div>';
 
 court.games.forEach((game,gi)=>{
 const scored=game.s1!==null&&game.s2!==null;
 const w1=scored&&game.s1>game.s2,w2=scored&&game.s2>game.s1;
+const gk=gameKey(s,ci,gi),err=scoreErrors[gk];
+const val=p=>{const d=scoreDrafts[gk+'|'+p];return d!==undefined?d:(p===1?game.s1:game.s2)??'';};
+const box=(p,cls)=>'<input class="score-input'+cls+(err?' invalid':'')+'" id="s-'+ci+'-'+gi+'-'+p+'" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" enterkeyhint="next" placeholder="—" value="'+val(p)+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="'+p+'" aria-label="Score for '+esc(nameOf((p===1?game.pair1:game.pair2)[0]))+' &amp; '+esc(nameOf((p===1?game.pair1:game.pair2)[1]))+'">';
 h+='<div class="game-card">'
 +'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+(game.sitOut?' · '+sitOutNames(game)+' sit'+(Array.isArray(game.sitOut)&&game.sitOut.length>1?'':'s')+' out':'')+'</span>'
 +(scored
-?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">edit</button></span>'
+?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">clear</button></span>'
 :'<span class="game-status-pending">● Enter score</span>')
 +'</div>'
 +'<div class="game-score-body">'
 +'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair1[1])+'</div>'
-+'<div class="score-inputs"><input class="score-input'+(scored?(w1?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-1" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s1!==null?game.s1:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="1"></div></div>'
++'<div class="score-inputs">'+box(1,scored?(w1?' winning':' losing'):'')+'</div></div>'
 +'<div class="vs-col"><span class="vs-text">VS</span>'+(scored?'<span class="vs-score">'+game.s1+'–'+game.s2+'</span>':'')+'</div>'
 +'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair2[1])+'</div>'
-+'<div class="score-inputs"><input class="score-input'+(scored?(w2?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-2" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s2!==null?game.s2:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="2"></div></div>'
-+'</div></div>';
++'<div class="score-inputs">'+box(2,scored?(w2?' winning':' losing'):'')+'</div></div>'
++'</div>'
++'<div class="score-msg" id="msg-'+ci+'-'+gi+'">'+(err?esc(err):'')+'</div>'
++'</div>';
 });
 
 // Live scoreboard
@@ -983,7 +1261,7 @@ if(numCourts>1&&allDone){
 if(ci>0&&i<2) tag='<span class="sb-tag tag-up">▲ Move Up</span>';
 if(ci<numCourts-1&&i>=ranked.length-2) tag='<span class="sb-tag tag-down">▼ Move Down</span>';
 }
-h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+nameOf(id)+'</span><span class="sb-pts">'+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
+h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+(climbers.includes(id)?' <span class="climber-mark" title="Moved up last round — wins ties">↑</span>':'')+'</span><span class="sb-pts">'+(s.rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
 });
 h+='</div>';
 }
@@ -991,47 +1269,59 @@ h+='</div>';
 });
 
 if(s.skipped.length){
-h+='<div style="background:var(--red-dim);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;">⚠ Skipped today (−2 ranks): <strong>'+s.skipped.map(id=>nameOf(id)).join(', ')+'</strong></div>';
+h+='<div style="background:var(--red-dim);border:1px solid color-mix(in srgb,var(--red) 30%,transparent);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;">⚠ Skipped today (−2 ranks): <strong>'+s.skipped.map(id=>nameOf(id)).join(', ')+'</strong></div>';
 }
 
-const isLastRound=s.round>=s.numRounds;
-const btnLabel=isLastRound?'Finalise &amp; Update Rankings':'Complete Round '+s.round+' → Start Round '+(s.round+1);
-const btnId=isLastRound?'finalise-btn':'advance-round-btn';
+// Rounds are open-ended: once every game of this round is scored, add another round or end the session
+const cancelBlocked=cancelBlockReason(s);
 h+='<div class="btn-row">'
-+'<button class="btn btn-primary" id="'+btnId+'"'+(allDone?'':' disabled')+'>'+btnLabel+'</button>'
-+(s.numRounds>1?'<button class="btn btn-outline" id="remove-round-btn">Remove Round '+s.numRounds+'</button>':'')
-+'<button class="btn btn-danger" id="cancel-session-btn">Cancel Session</button>'
++'<button class="btn btn-outline" id="advance-round-btn"'+(allDone?'':' disabled')+'>+ Add Round '+(s.round+1)+'</button>'
++'<button class="btn btn-primary" id="finalise-btn"'+(allDone?'':' disabled')+'>🏁 End Today\'s Session</button>'
 +'</div>'
-+'<div style="font-size:12px;color:'+(allDone?'var(--green)':'var(--muted)')+';margin-top:8px;">'
-+(allDone?(isLastRound?'All games scored — ready to finalise! 🏆':'Round '+s.round+' complete — ready for the next round! 🏸'):(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining.')
-+'</div></div>';
++'<div style="font-size:12px;color:'+(allDone?'var(--up)':'var(--muted)')+';margin-top:8px;">'
++(allDone?'Round '+s.round+' complete — add another round, or end today\'s session to update the ladder. 🏸':(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining in Round '+s.round+'.')
++'</div>'
++roundSummaryHtml(s)
++'<details class="more-menu" id="session-more"'+(sessionMoreOpen?' open':'')+'><summary>⋯ More options</summary><div class="more-menu-body">'
++(s.round>1?'<button class="btn btn-outline" id="remove-round-btn">Remove Round '+s.round+'</button>':'')
++'<button class="btn btn-danger" id="cancel-session-btn"'+(cancelBlocked?' disabled':'')+'>Cancel Session</button>'
++(cancelBlocked?'<div class="more-menu-hint">'+cancelBlocked+'</div>':'')
++'</div></details>'
++'</div>';
 
-root.innerHTML=h;
+sessionRendering=true;root.innerHTML=h;sessionRendering=false;
 
 // ── Bind all session events ──
-if(pendingRemoveSession!==null){
-el('sess-confirm-yes').addEventListener('click',()=>doRemoveFromSession(pendingRemoveSession.ci,pendingRemoveSession.pid));
-el('sess-confirm-no').addEventListener('click',()=>{pendingRemoveSession=null;renderSession();});
-}
-
+el('session-more').addEventListener('toggle',e=>{sessionMoreOpen=e.target.open;});
+root.querySelectorAll('[data-court-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+courtTab=Number(btn.dataset.courtTab);
+try{localStorage.setItem('smash_court_tab',String(courtTab));}catch(e){}
+renderSession();
+}));
 const rrb=el('remove-round-btn');
-if(rrb)rrb.addEventListener('click',()=>{pendingRemoveRound=true;renderSession();});
-if(el('round-confirm-yes')){
-el('round-confirm-yes').addEventListener('click',removeLastRound);
-el('round-confirm-no').addEventListener('click',()=>{pendingRemoveRound=false;renderSession();});
-}
+if(rrb)rrb.addEventListener('click',confirmRemoveRound);
 
 root.querySelectorAll('.pill-remove').forEach(btn=>{
 btn.addEventListener('click',e=>{
 e.stopPropagation();
-pendingRemoveSession={ci:Number(btn.dataset.ci),pid:Number(btn.dataset.pid)};
-renderSession();
+confirmRemoveFromSession(Number(btn.dataset.ci),Number(btn.dataset.pid));
 });
 });
 
+root.querySelectorAll('[data-deuce]').forEach(btn=>{
+btn.addEventListener('click',()=>{
+const court=S.activeSession.courts[Number(btn.dataset.ci)];
+const on=btn.dataset.deuce==='1';
+if(!on&&court.games.some(g=>g.s1!==null&&g.s2!==null&&Math.max(g.s1,g.s2)>court.maxScore))return;
+court.deuce=on;
+save();renderSession();
+});
+});
 root.querySelectorAll('[data-ms]').forEach(btn=>{
 btn.addEventListener('click',()=>{
-S.activeSession.courts[Number(btn.dataset.ci)].maxScore=Number(btn.dataset.ms);
+const court=S.activeSession.courts[Number(btn.dataset.ci)];
+if(court.games.some(g=>g.s1!==null&&g.s2!==null))return; // scores were validated against the current length
+court.maxScore=Number(btn.dataset.ms);
 save();renderSession();
 });
 });
@@ -1039,45 +1329,45 @@ save();renderSession();
 root.querySelectorAll('.edit-btn').forEach(btn=>{
 btn.addEventListener('click',()=>{
 const ci=Number(btn.dataset.ci),gi=Number(btn.dataset.gi);
+clearScoreDraft(gameKey(S.activeSession,ci,gi));
 S.activeSession.courts[ci].games[gi].s1=null;
 S.activeSession.courts[ci].games[gi].s2=null;
 save();renderSession();
 });
 });
 
+// Scores are drafts until the game is committed: after a pause in typing, on leaving the game,
+// or on Enter. Either box can be filled first — nothing is saved until both have a value.
 root.querySelectorAll('.score-input').forEach(inp=>{
-inp.addEventListener('input',async()=>{
-const ci=Number(inp.dataset.ci),gi=Number(inp.dataset.gi);
-const v1=el('s-'+ci+'-'+gi+'-1')?.value;
-const v2=el('s-'+ci+'-'+gi+'-2')?.value;
-if(v1===''||v2===''||v1===undefined||v2===undefined)return;
-const s1=parseInt(v1),s2=parseInt(v2);
-if(isNaN(s1)||isNaN(s2))return;
-if(!CAN_EDIT&&CAN_SCORE){
-const game=S.activeSession.courts[ci].games[gi];
-const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
-if(error){
-  if(error.message?.startsWith('Score conflict:')){toast('Score conflict — latest score loaded.');await refreshFromCloud();return;}
-  toast('Score not saved: '+error.message);return;
+const ci=Number(inp.dataset.ci),gi=Number(inp.dataset.gi),p=inp.dataset.pair;
+const partner=el('s-'+ci+'-'+gi+'-'+(p==='1'?'2':'1'));
+inp.addEventListener('focus',()=>inp.select());
+inp.addEventListener('input',()=>{
+const v=inp.value.replace(/\D/g,'').slice(0,2);
+if(v!==inp.value)inp.value=v;
+const gk=gameKey(S.activeSession,ci,gi);
+scoreDrafts[gk+'|'+p]=v;
+if(scoreErrors[gk]){
+delete scoreErrors[gk];
+el('msg-'+ci+'-'+gi).textContent='';
+inp.classList.remove('invalid');if(partner)partner.classList.remove('invalid');
 }
-await refreshFromCloud();return;
-}
-const game=S.activeSession.courts[ci].games[gi];
-const wasScored=game.s1!==null&&game.s2!==null;
-game.s1=s1;
-game.s2=s2;
-save();
-if(!wasScored){
-const focusedId=inp.id,selStart=inp.selectionStart,selEnd=inp.selectionEnd;
-renderSession();
-const refocus=el(focusedId);
-if(refocus){refocus.focus();try{refocus.setSelectionRange(selStart,selEnd);}catch(err){}}
-}
+scheduleScoreCommit(ci,gi);
+});
+inp.addEventListener('keydown',e=>{
+if(e.key!=='Enter')return;
+e.preventDefault();
+if(partner&&partner.value===''){partner.focus();return;}
+inp.blur();
+});
+inp.addEventListener('blur',e=>{
+if(sessionRendering||e.relatedTarget===partner)return; // re-render, or moving to the other box of this game
+afterInteraction(()=>commitScore(ci,gi));
 });
 });
 
 const fb=el('finalise-btn');
-if(fb)fb.addEventListener('click',finaliseSession);
+if(fb)fb.addEventListener('click',confirmEndSession);
 const ab=el('advance-round-btn');
 if(ab)ab.addEventListener('click',advanceRound);
 const cb=el('cancel-session-btn');
@@ -1085,13 +1375,29 @@ if(cb)cb.addEventListener('click',cancelSession);
 }
 
 // ── Remove from session ───────────────────────────────────────────────
+function confirmRemoveFromSession(ci,pid){
+const court=S.activeSession?.courts[ci];if(!court)return;
+const name=nameOf(pid);
+const scored=court.games.filter(g=>g.s1!==null&&g.s2!==null).length;
+const left=court.players.length-1;
+confirmDialog({
+title:'Remove '+name+' from the session?',
+body:'<strong>'+esc(name)+'</strong> leaves Court '+(ci+1)+' and the court\'s games are rebuilt for '+left+' player'+(left===1?'':'s')+'.'
++(scored?' <strong>'+(scored>1?'All '+scored+' scores':'The score')+' entered on Court '+(ci+1)+' will be cleared.</strong>':'')
++(left<4?' ⚠ Court '+(ci+1)+' will then have too few players for doubles.':''),
+confirmWord:name,confirmLabel:'Remove from session',cancelLabel:'Keep playing',
+onConfirm:()=>{
+if(!S.activeSession?.courts[ci]?.players.includes(pid)){toast('Session changed — nothing removed');render();return;}
+doRemoveFromSession(ci,pid);
+}
+});
+}
 function doRemoveFromSession(ci,pid){
 pid=Number(pid);
 const name=nameOf(pid);
 const court=S.activeSession.courts[ci];
 court.players=court.players.filter(id=>id!==pid);
 S.activeSession.attending=S.activeSession.attending.filter(id=>id!==pid);
-pendingRemoveSession=null;
 if(court.players.length>=4&&court.players.length<=7){
 court.games=buildGames(court.players);
 save();renderSession();toast(name+' removed from session');
@@ -1112,12 +1418,17 @@ g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
 if(g.s1>g.s2)g.pair1.forEach(id=>winMap[id]++);else g.pair2.forEach(id=>winMap[id]++);
 }
 });
+// Order: wins (when ranking by wins) → points → a player who moved up into this court last round
+// beats one who was already here (the climber stays up) → current ladder rank.
+const climbers=court.climbers||[];
 const ranked=[...court.players].sort((a,b)=>{
 if(rankBasis==='wins'){
 const dw=(winMap[b]||0)-(winMap[a]||0);
 if(dw!==0)return dw;
 }
-const d=(ptMap[b]||0)-(ptMap[a]||0);return d!==0?d:gp(a).rank-gp(b).rank;
+const d=(ptMap[b]||0)-(ptMap[a]||0);if(d!==0)return d;
+const dc=climbers.includes(b)-climbers.includes(a);if(dc!==0)return dc;
+return gp(a).rank-gp(b).rank;
 });
 return{ranked,ptMap,winMap,players:court.players};
 }
@@ -1187,9 +1498,13 @@ if(vr===undefined)return;
 const ci=rankToCourtIdx[vr];
 if(ci!==undefined)buckets[ci].push(id);
 });
+// remember who came up from a lower court — they win ties in the new round (see tallyCourt)
+const prevCourtOf={};
+session.courts.forEach((c,ci)=>c.players.forEach(id=>prevCourtOf[id]=ci));
 return buckets.map((ids,ci)=>{
 const sorted=[...ids].sort((a,b)=>virtualRanks[a]-virtualRanks[b]);
-return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21};
+const climbers=sorted.filter(id=>prevCourtOf[id]>ci);
+return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21,deuce:!!(session.courts[ci]&&session.courts[ci].deuce),climbers};
 });
 }
 
@@ -1197,40 +1512,74 @@ return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?sessi
 function advanceRound(){
 if(!CAN_EDIT){toast('Only a team admin can move to the next round');return;}
 const s=S.activeSession;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');renderSession();return;}
 s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
 s.rounds.push({courts:s.courts});
 s.courts=regroupForNextRound(s,virtual);
 s.round+=1;
+s.numRounds=s.round;
 save();renderSession();toast('Round '+(s.round-1)+' complete — Round '+s.round+' started! 🏸');
 }
+function roundComplete(s){
+return!!s&&s.courts.every(c=>c.games.every(g=>g.s1!==null&&g.s2!==null));
+}
 
-// ── Remove the last round of the session ────────────────────────────────
-// Case 1: last round hasn't been reached yet  -> just lower numRounds.
-// Case 2: last round is the one on the courts -> discard its scores, reopen the previous
-//         round as the final one (undoing the stats that advanceRound() already booked).
+// ── Remove the current round ────────────────────────────────────────────
+// Discards the round on the courts and reopens the previous one (undoing the stats that
+// advanceRound() booked for it), so the session can carry on or end from there.
+function confirmRemoveRound(){
+const s=S.activeSession;
+if(!s||s.round<=1)return;
+const n=s.round;
+const scored=s.courts.reduce((sum,c)=>sum+c.games.filter(g=>g.s1!==null&&g.s2!==null).length,0);
+const total=s.courts.reduce((sum,c)=>sum+c.games.length,0);
+const body=scored
+?'<strong>Round '+n+'</strong> is in progress ('+scored+' of '+total+' games scored). Removing it <strong>discards those scores</strong> and reopens Round '+(n-1)+' (its scores are kept).'
+:'<strong>Round '+n+'</strong> has no scores yet. Removing it reopens Round '+(n-1)+', so you can end the session from there.';
+confirmDialog({
+title:'Remove Round '+n+'?',body,
+confirmWord:'REMOVE',confirmLabel:scored?'Discard & remove':'Remove round',cancelLabel:'Keep round',
+onConfirm:()=>{
+if(S.activeSession?.round!==n){toast('Session changed — no round removed');render();return;}
+removeLastRound();
+}
+});
+}
 function removeLastRound(){
 const s=S.activeSession;
-if(!s||s.numRounds<=1){pendingRemoveRound=false;renderSession();return;}
-const removed=s.numRounds;
-if(s.numRounds>s.round){
-s.numRounds--;
-}else{
-const prev=s.rounds.pop();
-if(!prev){pendingRemoveRound=false;renderSession();return;}
+const prev=s&&s.rounds.pop();
+if(!prev){renderSession();return;}
+const removed=s.round;
 prev.courts.forEach(unaccumulateStats);
 s.courts=prev.courts;
 s.round--;
-s.numRounds--;
-}
-pendingRemoveRound=false;
+s.numRounds=s.round;
 save();renderSession();toast('Round '+removed+' removed');
 }
 
 // ── Finalise ──────────────────────────────────────────────────────────
+function confirmEndSession(){
+const s=S.activeSession;if(!s)return;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');return;}
+const n=s.round;
+confirmDialog({
+title:'End today\'s session?',
+body:'The session ends after <strong>'+n+' round'+(n>1?'s':'')+'</strong> and the ladder is updated for the '+s.attending.length+' players who played.'
++(s.skipped.length?' '+s.skipped.length+' absent player'+(s.skipped.length>1?'s drop':' drops')+' 2 places.':'')
++' Want to keep playing? Choose <strong>+ Add Round '+(n+1)+'</strong> instead.',
+confirmLabel:'End session & update ladder',cancelLabel:'Not yet',
+onConfirm:()=>{
+if(S.activeSession?.round!==n){toast('Session changed — not ended');render();return;}
+finaliseSession();
+}
+});
+}
 function finaliseSession(){
 if(!CAN_EDIT){toast('Only a team admin can finish the session');return;}
 const s=S.activeSession;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');renderSession();return;}
+s.numRounds=s.round; // sessions started before rounds were open-ended may carry a planned count
 const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
 
 s.courts.forEach(accumulateStats);
@@ -1266,14 +1615,28 @@ S.activeSession=null;
 save();showTab('ladder');toast('Rankings updated! 🏆');
 }
 
+// Cancelling throws the whole session away, so it's only allowed before any score exists — in
+// this round or an earlier one. Returns why cancelling is blocked, or null when it's allowed.
+function cancelBlockReason(s){
+if(s.rounds&&s.rounds.length)return(s.rounds.length===1?'Round 1 is':'Rounds 1–'+s.rounds.length+' are')+' already complete, so this session can\'t be cancelled — end it instead.';
+const n=s.courts.reduce((sum,c)=>sum+c.games.filter(g=>g.s1!==null||g.s2!==null).length,0);
+if(n)return n+' game'+(n>1?'s have':' has')+' a score. Clear '+(n>1?'them':'it')+' (tap “clear” on the game) to cancel the session.';
+return null;
+}
 function cancelSession(){
 if(!CAN_EDIT){toast('Only a team admin can cancel the session');return;}
-const s=S.activeSession;
-const done=s.rounds?s.rounds.length:0;
-if(!confirm('Cancel this session?\n\nNothing is added to History'+(done?', and the wins, losses and points from the '+done+' completed round'+(done>1?'s':'')+' are removed from the ladder':'')+'.'))return;
-// Rounds already advanced past have had their stats booked — take them back off
-(s.rounds||[]).forEach(r=>r.courts.forEach(unaccumulateStats));
+const s=S.activeSession;if(!s)return;
+if(cancelBlockReason(s)){toast('Scores are entered — session can\'t be cancelled');renderSession();return;}
+confirmDialog({
+title:'Cancel this session?',
+body:'The <strong>'+esc(s.date)+'</strong> session ('+s.attending.length+' players, '+s.courts.length+' court'+(s.courts.length>1?'s':'')+') will be thrown away. Nothing is added to History and the ladder stays as it is.',
+confirmWord:'CANCEL',confirmLabel:'Cancel session',cancelLabel:'Keep session',
+onConfirm:()=>{
+// a scorer may have entered a score while the dialog was open
+if(!S.activeSession||cancelBlockReason(S.activeSession)){toast('Scores were entered — session not cancelled');render();return;}
 S.activeSession=null;save();showTab('ladder');toast('Session cancelled');
+}
+});
 }
 
 // ── Members & roles ───────────────────────────────────────────────────
@@ -1287,15 +1650,35 @@ const ids=(members||[]).map(m=>m.user_id);
 const{data:profiles}=ids.length?await SB.from('user_profiles').select('user_id,email').in('user_id',ids):{data:[]};
 const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
 const canCreateAdmin=CURRENT_TEAM.app_role==='platform_admin';
-let h='<div class="card"><div class="section-label">Team passcode</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Viewers enter <strong>'+esc(CURRENT_TEAM.team_name)+'</strong>, their email, and the shared passcode. It remains available to Team Admins for six hours after it is created or rotated.</div><div class="btn-row"><button class="btn btn-outline" id="passcode-btn">Show passcode</button><button class="btn btn-outline" id="rotate-passcode-btn">Rotate passcode</button></div><div id="passcode-result" style="margin-top:10px;font-family:Space Mono,monospace;color:var(--green);"></div></div>';
+let h='<div class="card"><div class="section-label">Share link</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Anyone with this link can watch the ladder and live scores — read-only, no account or passcode needed. Send it in your team chat.</div>'
++'<div class="share-row"><input class="add-input" id="share-link" readonly placeholder="Loading…" aria-label="Share link"><button class="btn btn-primary" id="copy-link-btn" disabled>Copy</button>'+(navigator.share?'<button class="btn btn-outline" id="send-link-btn" disabled>Share</button>':'')+'</div>'
++'<div class="btn-row" style="margin-top:10px;"><button class="btn btn-outline" id="rotate-link-btn">Make a new link</button></div><div id="share-result" style="font-size:12px;margin-top:8px;color:var(--muted);"></div></div>';
 const playerOptions='<option value="">Not linked to a player</option>'+S.players.filter(p=>p.email).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' — '+esc(p.email)+'</option>').join('');
 h+='<div class="card"><div class="section-label">Create account / promote player</div><div class="add-form"><input class="add-input" id="member-email" type="email" placeholder="Email"><select id="member-role" class="add-input" style="max-width:160px;"><option value="scorer">Scoring User</option>'+(canCreateAdmin?'<option value="team_admin">Team Admin</option>':'')+'</select></div><select id="member-player" class="add-input" style="width:100%;margin-bottom:10px;">'+playerOptions+'</select><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="add-input" id="member-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank"></div><button class="btn btn-primary" id="create-member-btn">Create account</button><div id="member-result" style="font-size:12px;margin-top:10px;color:var(--muted);"></div></div>';
 h+='<div class="section-label">Accounts</div>';
 (members||[]).forEach(m=>{h+='<div class="card"><div class="player-row"><div class="rank-num">'+(m.role==='team_admin'?'★':'✎')+'</div><div><div class="player-name">'+esc(emailById[m.user_id]||m.user_id)+'</div><div class="player-stats">'+(m.role==='team_admin'?'Team Admin':'Scoring User')+'</div></div></div></div>';});
 root.innerHTML=h;
-const showPasscode=async rotate=>{const{data,error}=await SB.rpc('create_or_rotate_viewer_passcode',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});el('passcode-result').textContent=error?error.message:(data?'Passcode: '+data:'This passcode is no longer available. Rotate it to generate a new one.');};
-el('passcode-btn').addEventListener('click',()=>showPasscode(false));el('rotate-passcode-btn').addEventListener('click',()=>showPasscode(true));
-showPasscode(false);
+const showShareLink=async rotate=>{
+const{data,error}=await SB.rpc('get_or_rotate_share_link',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});
+if(!el('share-link'))return; // left the tab meanwhile
+if(error){el('share-result').style.color='var(--red)';el('share-result').textContent='Could not load the share link: '+error.message;return;}
+el('share-link').value=location.origin+location.pathname+'?join='+data;
+el('copy-link-btn').disabled=false;if(el('send-link-btn'))el('send-link-btn').disabled=false;
+if(rotate){el('share-result').style.color='var(--up)';el('share-result').textContent='New link ready — the old one no longer works.';}
+};
+el('copy-link-btn').addEventListener('click',async()=>{
+const url=el('share-link').value;
+try{await navigator.clipboard.writeText(url);}catch(e){el('share-link').select();document.execCommand('copy');}
+toast('Link copied');
+});
+if(el('send-link-btn'))el('send-link-btn').addEventListener('click',()=>navigator.share({title:CURRENT_TEAM.team_name+' — Smash Ladder',url:el('share-link').value}).catch(()=>{}));
+el('rotate-link-btn').addEventListener('click',()=>confirmDialog({
+title:'Make a new share link?',
+body:'The current link <strong>stops working</strong>, and everyone who joined through it loses access until you send them the new link. Team admins and scorers are not affected.',
+confirmWord:'NEW LINK',confirmLabel:'Make new link',cancelLabel:'Keep current link',
+onConfirm:()=>showShareLink(true)
+}));
+showShareLink(false);
 el('member-player').addEventListener('change',()=>{const p=gp(el('member-player').value);if(p?.email)el('member-email').value=p.email;});
 el('create-member-btn').addEventListener('click',async()=>{
 const email=el('member-email').value.trim(),password=el('member-password').value;
@@ -1303,7 +1686,7 @@ if(!email){el('member-result').textContent='Enter an email address.';return;}
 if(password&&password.length<8){el('member-result').textContent='Temporary password must contain at least 8 characters.';return;}
 const playerId=el('member-player').value||undefined;
 const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{teamId:CURRENT_TEAM.team_id,email,role:el('member-role').value,playerId:Number(playerId)||undefined,password:password||undefined,generatePassword:!password}});
-el('member-result').style.color=error||data?.error?'var(--red)':'var(--green)';
+el('member-result').style.color=error||data?.error?'var(--red)':'var(--up)';
 el('member-result').textContent=error||data?.error||(data.temporaryPassword?'Account created. Temporary password: '+data.temporaryPassword:'Account created.');
 if(!error&&!data?.error)renderMembers();
 });
@@ -1364,7 +1747,7 @@ if(password&&password.length<8){out.textContent='Temporary password must contain
 const{data,error}=await SB.functions.invoke('admin-provision-user',{body:{action:'create_team',teamName,email,role:'team_admin',password:password||undefined,generatePassword:!password}});
 let functionError=error?.message||data?.error;
 if(error?.context){try{const detail=await error.context.clone().json();functionError=detail.error||functionError;}catch(e){}}
-out.style.color=functionError?'var(--red)':'var(--green)';
+out.style.color=functionError?'var(--red)':'var(--up)';
 out.textContent=functionError||(data.temporaryPassword?'Team created. Temporary password: '+data.temporaryPassword:'Team created.');
 if(!error&&!data?.error){el('create-team-modal')?.remove();await startApp();}
 }
@@ -1413,14 +1796,14 @@ if(!email){result.style.color='var(--red)';result.textContent='Enter an email ad
 if(password&&password.length<8){result.style.color='var(--red)';result.textContent='New password must contain at least 8 characters.';return;}
 if(!password&&email===originalEmail){result.style.color='var(--muted)';result.textContent='No changes to save.';return;}
 const error=await manageTeam({teamId,teamAdminUserId:userId,email:email===originalEmail?undefined:email,password:password||undefined});
-result.style.color=error?'var(--red)':'var(--green)';
+result.style.color=error?'var(--red)':'var(--up)';
 result.textContent=error||'Team Admin account updated.';
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
 function renderSettings(){
 const root=el('tab-settings');
-const dot=syncStatus.state==='synced'?'var(--green)':syncStatus.state==='error'?'var(--red)':syncStatus.state==='syncing'?'var(--yellow)':'var(--muted)';
+const dot=syncStatus.state==='synced'?'var(--up)':syncStatus.state==='error'?'var(--red)':syncStatus.state==='syncing'?'var(--yellow)':'var(--muted)';
 const roleLabel=CURRENT_TEAM?.app_role==='platform_admin'?'Platform Admin (full access)':CURRENT_TEAM?.app_role==='team_admin'?'Team Admin':CURRENT_TEAM?.app_role==='scorer'?'Scoring User':'Viewer (read-only)';
 let h='<div class="card" style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:8px;">Cloud sync (Supabase)</div>';
 if(!CLOUD){
@@ -1469,11 +1852,17 @@ r.readAsText(f);
 on('import-btn',()=>{
 let d;try{d=JSON.parse(el('import-json').value);}catch(e){toast('That is not valid JSON');return;}
 if(!d||!Array.isArray(d.players)||!Array.isArray(d.sessions)){toast('JSON needs "players" and "sessions" lists');return;}
-if(!confirm('Replace ALL current data ('+S.players.length+' players, '+S.sessions.length+' sessions) with '+d.players.length+' players and '+d.sessions.length+' sessions?'))return;
+confirmDialog({
+title:'Replace all data?',
+body:'All current data — <strong>'+S.players.length+' players, '+S.sessions.length+' sessions'+(S.activeSession?' and the active session':'')+'</strong> — is replaced with the backup\'s <strong>'+d.players.length+' players and '+d.sessions.length+' sessions</strong>. This cannot be undone.',
+confirmWord:'REPLACE',confirmLabel:'Replace data',cancelLabel:'Keep current data',
+onConfirm:()=>{
 S=Object.assign(def(),d);
 S.nextId=Math.max(S.nextId||1,1,...S.players.map(p=>p.id+1));
 syncedSigs={};
 save();renderSettings();toast('Imported — saving to cloud');
+}
+});
 });
 }
 
@@ -1486,7 +1875,7 @@ return S.players.length!==Object.keys(s.ranksAfter).length||S.players.some(p=>s.
 // Undo the newest finalised session: stats, ranks and trend arrows go back to before it.
 function deleteLatestSession(){
 const s=S.sessions[S.sessions.length-1];
-if(!s){pendingDeleteSession=false;return;}
+if(!s)return;
 const rounds=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
 rounds.forEach(r=>(r.courts||[]).forEach(unaccumulateStats));
 if(s.ranksAfter&&s.rankChanges){
@@ -1502,32 +1891,38 @@ const prevDelta={};
 if(prev&&prev.rankChanges)prev.rankChanges.forEach(r=>prevDelta[r.name]=r.delta);
 S.players.forEach(p=>p.rankDelta=prevDelta[p.name]||0);
 S.sessions.pop();
-pendingDeleteSession=false;
 save();render();toast(s.date+' session deleted');
+}
+function confirmDeleteLatestSession(){
+const ls=S.sessions[S.sessions.length-1];if(!ls)return;
+const note=!ls.ranksAfter?' This session has no saved rank snapshot, so only wins/losses/points are reverted — ranks stay as they are.'
+:ladderDriftedSince(ls)?' ⚠ The ladder has changed since (ranks edited or players added/removed), so restored ranks may not be exact.'
+:' Rankings go back to how they were before it.';
+confirmDialog({
+title:'Delete this session?',
+body:'The <strong>'+esc(ls.date)+'</strong> session is removed from History and its wins, losses and points are taken off the ladder.'+note+' This cannot be undone.',
+confirmWord:ls.date,confirmLabel:'Delete session',cancelLabel:'Keep session',
+onConfirm:()=>{
+if(S.sessions[S.sessions.length-1]!==ls){toast('History changed — nothing deleted');render();return;}
+deleteLatestSession();
+}
+});
 }
 
 function renderHistory(){
 const root=el('tab-history');
 if(!S.sessions.length){root.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No sessions yet.</div>';return;}
 let h='';
-if(pendingDeleteSession){
-const ls=S.sessions[S.sessions.length-1];
-const note=!ls.ranksAfter?' This session has no saved rank snapshot, so only wins/losses/points are reverted — ranks stay as they are.'
-:ladderDriftedSince(ls)?' ⚠ The ladder has changed since (ranks edited or players added/removed), so restored ranks may not be exact.'
-:' Rankings go back to how they were before it.';
-h+='<div class="confirm-banner"><span class="confirm-banner-msg">Delete the <strong>'+ls.date+'</strong> session? Its wins, losses and points are removed.'+note+'</span>'
-+'<div class="confirm-banner-btns"><button class="cbtn-yes" id="del-sess-yes">Delete</button><button class="cbtn-no" id="del-sess-no">Cancel</button></div></div>';
-}
 [...S.sessions].reverse().forEach((s,idx)=>{
 const roundsArr=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
-h+='<div class="history-card"'+(idx===0&&pendingDeleteSession?' style="border-color:var(--red);"':'')+'>'
+h+='<div class="history-card">'
 +(idx===0?'<button class="btn btn-danger" id="del-latest-btn" style="float:right;padding:4px 10px;font-size:11px;">Delete</button>':'')
 +'<div class="history-date">'+s.date+' · '+roundsArr.length+' round'+(roundsArr.length>1?'s':'')+' · '+roundsArr[0].courts.length+' courts · '+s.attending.length+' players</div>';
 roundsArr.forEach((r,ri)=>{
-if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--green);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
+if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--accent);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
 r.courts.forEach((c,ci)=>{
 if(ci>0)h+='<hr class="div">';
-h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--green)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
+h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--accent)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
 h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
@@ -1542,11 +1937,7 @@ if(changes.length)h+='<div style="font-size:11px;color:var(--muted);margin-top:6
 h+='</div>';
 });
 root.innerHTML=h;
-el('del-latest-btn').addEventListener('click',()=>{pendingDeleteSession=true;renderHistory();});
-if(pendingDeleteSession){
-el('del-sess-yes').addEventListener('click',deleteLatestSession);
-el('del-sess-no').addEventListener('click',()=>{pendingDeleteSession=false;renderHistory();});
-}
+el('del-latest-btn').addEventListener('click',confirmDeleteLatestSession);
 }
 
 if(CLOUD){
@@ -1561,7 +1952,7 @@ if(document.hidden){flushOnHide();return;}
 if(USER&&!(CAN_EDIT&&localStorage.getItem(DIRTY_KEY)))refreshFromCloud();
 });
 window.addEventListener('pagehide',flushOnHide);
-startApp();
+joinFromShareLink().then(startApp).then(()=>{if(linkError){toast(linkError);linkError='';}});
 }else{
 render();
 }
