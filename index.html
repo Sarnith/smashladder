@@ -119,6 +119,16 @@ header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space
 .theme-mode{display:flex;gap:6px;padding:4px 4px 10px;}
 .theme-mode .score-opt{flex:1;padding:7px 6px;}
 .theme-swatch{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);flex-shrink:0;}
+/* Setup modal helpers */
+.attend-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.link-btn{background:none;border:none;padding:0;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;}
+.modal-foot{position:sticky;bottom:-20px;background:var(--card);margin:0 -20px -20px;padding:12px 20px 16px;border-top:1px solid var(--border);}
+.opt-group{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-right:10px;}
+.player-stats span{white-space:nowrap;}
+:root{--lh-w:30px;--rank-w:34px;}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.tabs::-webkit-scrollbar,.court-tabs::-webkit-scrollbar{display:none;}
+.tabs,.court-tabs{scrollbar-width:none;}
 /* Remove button */
 .rank-edit-input{
 width:42px;height:42px;text-align:center;
@@ -303,6 +313,48 @@ body.viewer #new-session-btn,body.viewer .tab[data-tab="players"],body.viewer .t
 body.viewer .score-input,body.viewer .rank-edit-input,body.viewer .score-opt,body.viewer .pair-col{pointer-events:none;}
 body.scorer #new-session-btn,body.scorer .tab[data-tab="players"],body.scorer .tab[data-tab="members"],body.scorer .tab[data-tab="settings"],body.scorer .pill-remove,body.scorer .edit-btn,body.scorer #del-latest-btn,body.scorer .more-menu,body.scorer #finalise-btn,body.scorer #advance-round-btn,body.scorer .max-score-row{display:none!important;}
 body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
+/* Phones */
+@media (max-width:560px){
+.hide-sm{display:none;}
+.wrap{padding:0 10px 60px;}
+header{padding:16px 0 12px;}
+.logo-text{font-size:16px;white-space:nowrap;}
+.logo-sub{font-size:9px;letter-spacing:1.5px;}
+.session-btn{padding:9px 12px;}
+.tabs{gap:2px;margin-bottom:14px;}
+.tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:10.5px;}
+.tab-ic{font-size:15px;line-height:1.1;}
+.card{padding:12px;}
+.ladder-head{padding:0 12px 6px;}
+.ladder-head .section-label{letter-spacing:1px;}
+:root{--lh-w:27px;}
+.lh-cell{width:27px;height:25px;font-size:11px;}
+.ladder-row{gap:4px;}
+.rank-num{font-size:17px;}
+.session-panel{padding:12px;}
+.court-block{padding:10px;}
+.court-hdr{flex-wrap:wrap;gap:2px 10px;}
+.court-tabs{gap:3px;padding:3px;}
+.court-tab{flex:1 1 0;min-width:0;flex-direction:column;gap:3px;padding:6px 4px;font-size:12px;}
+.pair-col{padding:10px 4px;}
+.score-input{width:54px;height:44px;font-size:20px;}
+.add-form{flex-wrap:wrap;}
+.add-form>*{flex:1 1 100%;max-width:none!important;}
+.add-input,select,textarea{font-size:16px!important;} /* under 16px, iPhones zoom the page on focus */
+.modal-bg{padding:10px;align-items:flex-end;}
+.modal{padding:16px;max-height:calc(100dvh - 20px);border-radius:14px;}
+.modal-foot{bottom:-16px;margin:0 -16px -16px;padding:12px 16px 14px;}
+.player-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;}
+.player-check{padding:7px 9px;display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+.profile-popover{width:min(310px,calc(100vw - 20px));}
+.toast{white-space:normal;text-align:center;width:max-content;max-width:calc(100vw - 32px);bottom:calc(16px + env(safe-area-inset-bottom));}
+}
+/* Small phones */
+@media (max-width:380px){
+.hide-xs{display:none;}
+:root{--lh-w:25px;--rank-w:26px;}
+.lh-cell{width:25px;}
+}
 </style>
 </head>
 <body>
@@ -312,14 +364,14 @@ body:not(.platform-admin) .tab[data-tab="admin"]{display:none!important;}
 <div class="logo-text">🏸 SMASH LADDER</div>
 <div class="logo-sub"><span id="team-name">Badminton Rankings</span> <span id="live-badge" style="margin-left:6px;letter-spacing:0;"></span></div>
 </div>
-<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="new-session-btn">+ New Session</button><div class="profile-wrap" id="profile-wrap"><button class="session-btn" id="profile-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);">👤 Profile</button></div></div>
+<div style="display:flex;gap:8px;align-items:center;"><button class="session-btn" id="new-session-btn">+ New<span class="hide-sm"> Session</span></button><div class="profile-wrap" id="profile-wrap"><button class="session-btn" id="profile-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);" aria-label="Profile">👤<span class="hide-sm"> Profile</span></button></div></div>
 </header>
 <div class="tabs">
-<button class="tab active" data-tab="ladder">🏆 Ladder</button>
-<button class="tab" data-tab="session">🎮 Session</button>
-<button class="tab" data-tab="history">📋 History</button>
-<button class="tab" data-tab="players">👤 Players</button>
-<button class="tab" data-tab="members">👥 Members</button>
+<button class="tab active" data-tab="ladder"><span class="tab-ic">🏆</span> <span>Ladder</span></button>
+<button class="tab" data-tab="session"><span class="tab-ic">🎮</span> <span>Session</span></button>
+<button class="tab" data-tab="history"><span class="tab-ic">📋</span> <span>History</span></button>
+<button class="tab" data-tab="players"><span class="tab-ic">👤</span> <span>Players</span></button>
+<button class="tab" data-tab="members"><span class="tab-ic">👥</span> <span>Members</span></button>
 </div>
 <div id="tab-ladder"></div>
 <div id="tab-session" style="display:none"></div>
@@ -758,7 +810,7 @@ const root=el('tab-ladder');
 if(!sorted.length){root.innerHTML='<div class="empty"><div class="empty-icon">🏸</div>No players yet.<br>Add players in the Players tab.</div>';return;}
 const hist=ladderHistory(5).reverse(); // newest session first
 const stats=hist.map(c=>sessionPlayerStats(c.s));
-const cols='grid-template-columns:34px minmax(0,1fr)'+(hist.length?' repeat('+hist.length+',30px)':' auto')+';';
+const cols='grid-template-columns:var(--rank-w) minmax(0,1fr)'+(hist.length?' repeat('+hist.length+',var(--lh-w))':' auto')+';';
 let h='<div class="ladder-head" style="'+cols+'"><span></span><span class="section-label" style="margin:0;">'+sorted.length+' players ranked</span>'
 +hist.map(c=>'<span class="lh-date">'+esc(shortDate(c.s.date))+(c.exact?'':'≈')+'</span>').join('')+'</div>';
 sorted.forEach(p=>{
@@ -779,7 +831,7 @@ return'<span class="lh-cell'+(d>0?' up':d<0?' down':'')+(absent?' absent':'')+'"
 const d=p.rankDelta||0;
 tail=d>0?'<span class="delta delta-up">▲'+d+'</span>':d<0?'<span class="delta delta-down">▼'+Math.abs(d)+'</span>':'<span class="delta delta-none">—</span>';
 }
-h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row ladder-row" style="'+cols+'"><div class="rank-num">'+p.rank+'</div><div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts'+(p.sessions>0?' · '+wr+'% win rate':'')+'</div></div>'+tail+'</div></div>';
+h+='<div class="card '+rc+'"><div class="card-accent '+ac+'"></div><div class="player-row ladder-row" style="'+cols+'"><div class="rank-num">'+p.rank+'</div><div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+['<span>'+p.wins+'W · '+p.losses+'L</span>','<span>'+(p.totalPts||0)+' pts</span>'].concat(p.sessions>0?['<span>'+wr+'%<span class="hide-xs"> win rate</span></span>']:[]).join(' · ')+'</div></div>'+tail+'</div></div>';
 });
 if(hist.length)h+='<div class="lh-legend"><span class="lh-cell up">3</span> climbed <span class="lh-cell down">5</span> dropped <span class="lh-cell absent">7</span> absent (−2) · rank after each of the last '+hist.length+' session'+(hist.length>1?'s':'')+', newest → oldest'+(hist.some(c=>!c.exact)?' · ≈ rebuilt from older data, may be approximate':'')+'</div>';
 root.innerHTML=h;
@@ -928,10 +980,16 @@ function buildModal(){
 const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
-let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
+let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+esc(p.name)+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
 let rb=[{v:'wins',l:'Wins then Points'},{v:'points',l:'Points only'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub attend-head"><span>Who\'s playing today? <strong id="attend-count" style="color:var(--text);"></strong></span><span><button class="link-btn" id="attend-all">Select all</button> · <button class="link-btn" id="attend-none">Clear</button></span></div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div class="modal-foot"><div id="modal-preview" style="font-size:12px;color:var(--muted);"></div><div class="btn-row" style="margin-top:10px;"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div></div>';
 document.body.appendChild(m);
+const setAll=on=>{
+m.querySelectorAll('.player-check').forEach(c=>{const pid=Number(c.dataset.pid);if(on)setup.attending.add(pid);else setup.attending.delete(pid);c.classList.toggle('attending',on);});
+renderCustomSizes();updatePreview();
+};
+el('attend-all').addEventListener('click',()=>setAll(true));
+el('attend-none').addEventListener('click',()=>setAll(false));
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
 const pid=Number(c.dataset.pid);
@@ -996,6 +1054,7 @@ return null;
 function updatePreview(){
 const n=setup.attending.size;
 const pv=el('modal-preview');if(!pv)return;
+el('attend-count').textContent=n?'· '+n+' selected':'';
 const sizes=sessionSizes();
 const err=sizesError(n,sizes);
 if(err){pv.textContent=err;return;}
@@ -1253,14 +1312,14 @@ h+='<span class="pill">'+nameOf(id)
 });
 h+='</div>';
 
-h+='<div class="max-score-row">Max score: '
+h+='<div class="max-score-row"><span class="opt-group">Game to '
 +[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'"'+(courtScored&&court.maxScore!==n?' disabled title="Clear this court\'s scores to change the game length"':'')+'>'+n+'</button>').join('')
-+'<span style="margin-left:10px;">Deuce:</span>'
++'</span><span class="opt-group">Deuce '
 +[{v:false,l:'Off'},{v:true,l:'On'}].map(o=>{
 const locked=!o.v&&court.deuce&&pastLength; // switching off would invalidate games already past the length
 return'<button class="score-opt'+(!!court.deuce===o.v?' active':'')+'" data-ci="'+ci+'" data-deuce="'+(o.v?1:0)+'"'+(locked?' disabled title="A game on this court went past '+court.maxScore+'"':'')+'>'+o.l+'</button>';
 }).join('')
-+'</div>';
++'</span></div>';
 
 court.games.forEach((game,gi)=>{
 const scored=game.s1!==null&&game.s2!==null;
@@ -1952,6 +2011,14 @@ const roundsArr=s.rounds&&s.rounds.length?s.rounds:[{courts:s.courts}];
 h+='<div class="history-card">'
 +(idx===0?'<button class="btn btn-danger" id="del-latest-btn" style="float:right;padding:4px 10px;font-size:11px;">Delete</button>':'')
 +'<div class="history-date">'+s.date+' · '+roundsArr.length+' round'+(roundsArr.length>1?'s':'')+' · '+roundsArr[0].courts.length+' courts · '+s.attending.length+' players</div>';
+if(s.skipped&&s.skipped.length)h+='<div style="font-size:11px;color:var(--red);margin-top:6px;">Skipped: '+s.skipped.map(id=>nameOf(id)).join(', ')+'</div>';
+if(s.rankChanges){
+const changes=s.rankChanges.filter(r=>r.delta!==0);
+if(changes.length)h+='<div style="font-size:11px;color:var(--muted);margin-top:6px;">'+changes.map(r=>esc(r.name)+' '+(r.delta>0?'<span style="color:var(--up);">▲'+r.delta+'</span>':'<span style="color:var(--red);">▼'+Math.abs(r.delta)+'</span>')).join(' · ')+'</div>';
+}
+// game-by-game scores are folded away (only the newest session starts open) so the list stays scannable on a phone
+const nGames=roundsArr.reduce((n,r)=>n+r.courts.reduce((m,c)=>m+c.games.length,0),0);
+h+='<details class="round-games"'+(idx===0?' open':'')+'><summary>Games ('+nGames+')</summary>';
 roundsArr.forEach((r,ri)=>{
 if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--accent);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
 r.courts.forEach((c,ci)=>{
@@ -1963,11 +2030,7 @@ h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+
 });
 });
 });
-if(s.skipped&&s.skipped.length)h+='<div style="font-size:11px;color:var(--red);margin-top:6px;">Skipped: '+s.skipped.map(id=>nameOf(id)).join(', ')+'</div>';
-if(s.rankChanges){
-const changes=s.rankChanges.filter(r=>r.delta!==0);
-if(changes.length)h+='<div style="font-size:11px;color:var(--muted);margin-top:6px;">'+changes.map(r=>r.name+' '+(r.delta>0?'▲'+r.delta:'▼'+Math.abs(r.delta))).join(' · ')+'</div>';
-}
+h+='</details>';
 h+='</div>';
 });
 root.innerHTML=h;
