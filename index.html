@@ -111,6 +111,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .sb-pts{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--green);}
 .sb-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;}
 .tag-up{background:var(--green-dim);color:var(--green);border:1px solid var(--green);}
+.climber-mark{font-size:11px;color:var(--green);font-weight:700;cursor:help;}
 .tag-down{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
 .section-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .add-form{display:flex;gap:8px;margin-bottom:16px;}
@@ -563,27 +564,32 @@ setTimeout(()=>t.classList.remove('show'),2500);
 }
 function el(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-// Two-step check for anything that deletes or discards data: the dialog spells out the impact
-// (step 1), and the action button stays disabled until the confirm word is typed (step 2).
+// Confirmation dialog. With `confirmWord` it is the two-step check every deletion goes through:
+// the dialog spells out the impact (step 1), and the red button stays disabled until the word is
+// typed (step 2). Without it, it is a plain one-step "are you sure" with a primary button.
 // `body` is HTML — callers escape any names they put in it.
-function confirmDanger({title,body,confirmWord,confirmLabel,cancelLabel='Keep it',onConfirm}){
+function confirmDialog({title,body,confirmWord,confirmLabel,cancelLabel='Keep it',onConfirm}){
 const old=el('danger-modal');if(old)old.remove();
 const m=document.createElement('div');m.className='modal-bg';m.id='danger-modal';
 m.innerHTML='<div class="modal"><button class="modal-close" id="danger-close" aria-label="Close">✕</button><div class="modal-title">'+esc(title)+'</div>'
-+'<div class="danger-impact">'+body+'</div>'
++(confirmWord
+?'<div class="danger-impact">'+body+'</div>'
 +'<label class="admin-form-label" for="danger-input">Type <span class="danger-word">'+esc(confirmWord)+'</span> to confirm</label>'
 +'<input class="add-input" id="danger-input" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;">'
-+'<div class="btn-row"><button class="btn btn-danger" id="danger-confirm" disabled>'+esc(confirmLabel)+'</button><button class="btn btn-outline" id="danger-cancel">'+esc(cancelLabel)+'</button></div></div>';
+:'<div class="modal-sub" style="font-size:13px;line-height:1.55;">'+body+'</div>')
++'<div class="btn-row"><button class="btn '+(confirmWord?'btn-danger':'btn-primary')+'" id="danger-confirm"'+(confirmWord?' disabled':'')+'>'+esc(confirmLabel)+'</button><button class="btn btn-outline" id="danger-cancel">'+esc(cancelLabel)+'</button></div></div>';
 document.body.appendChild(m);
-const norm=v=>v.trim().replace(/\s+/g,' ').toLowerCase();
-const inp=el('danger-input'),btn=el('danger-confirm');
+const btn=el('danger-confirm');
 const close=()=>m.remove();
-inp.addEventListener('input',()=>{btn.disabled=norm(inp.value)!==norm(confirmWord);});
-inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!btn.disabled)btn.click();});
 btn.addEventListener('click',()=>{close();onConfirm();});
 el('danger-close').addEventListener('click',close);
 el('danger-cancel').addEventListener('click',close);
 m.addEventListener('click',e=>{if(e.target===m)close();});
+if(!confirmWord){btn.focus();return;}
+const norm=v=>v.trim().replace(/\s+/g,' ').toLowerCase();
+const inp=el('danger-input');
+inp.addEventListener('input',()=>{btn.disabled=norm(inp.value)!==norm(confirmWord);});
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!btn.disabled)btn.click();});
 inp.focus();
 }
 
@@ -676,7 +682,7 @@ save();render();toast(name+' removed from ladder');
 
 function showRemovePlayerConfirmation(id){
 const player=gp(id);if(!player)return;
-confirmDanger({
+confirmDialog({
 title:'Remove player?',
 body:'<strong>'+esc(player.name)+'</strong> (#'+player.rank+') will be removed from this ladder, and everyone below moves up one place. This cannot be undone.',
 confirmWord:player.name,confirmLabel:'Remove player',cancelLabel:'Keep player',
@@ -705,12 +711,12 @@ save();renderPlayers();toast(target.name+' moved to #'+newRank);
 }
 
 // ── Session setup ─────────────────────────────────────────────────────
-let setup={attending:new Set(),numCourts:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+let setup={attending:new Set(),numCourts:2,rankBasis:'wins',splitMode:'auto',customSizes:[]};
 function openSessionModal(){
 if(!CAN_EDIT){toast('View-only account');return;}
 if(S.activeSession){toast('Finish the active session first');showTab('session');return;}
 if(S.players.length<4){toast('Add at least 4 players first');return;}
-setup={attending:new Set(),numCourts:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+setup={attending:new Set(),numCourts:2,rankBasis:'wins',splitMode:'auto',customSizes:[]};
 buildModal();
 }
 function buildModal(){
@@ -718,7 +724,7 @@ const sorted=[...S.players].sort((a,b)=>a.rank-b.rank);
 const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
-let rb=[{v:'points',l:'Points'},{v:'wins',l:'Wins then Points'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
+let rb=[{v:'wins',l:'Wins then Points'},{v:'points',l:'Points only'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
 m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
@@ -788,7 +794,7 @@ const pv=el('modal-preview');if(!pv)return;
 const sizes=sessionSizes();
 const err=sizesError(n,sizes);
 if(err){pv.textContent=err;return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · starts with Round 1 · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · starts with Round 1 · ranked by '+(setup.rankBasis==='wins'?'wins, then points':'points only');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
@@ -931,7 +937,8 @@ let h='<div class="session-panel">'
 +'<div class="progress-wrap"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
 
 s.courts.forEach((court,ci)=>{
-const{ranked,ptMap}=tallyCourt(court,s.rankBasis);
+const{ranked,ptMap,winMap}=tallyCourt(court,s.rankBasis);
+const climbers=court.climbers||[];
 const numCourts=s.courts.length;
 
 h+='<div class="court-block">'
@@ -978,7 +985,7 @@ if(numCourts>1&&allDone){
 if(ci>0&&i<2) tag='<span class="sb-tag tag-up">▲ Move Up</span>';
 if(ci<numCourts-1&&i>=ranked.length-2) tag='<span class="sb-tag tag-down">▼ Move Down</span>';
 }
-h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+nameOf(id)+'</span><span class="sb-pts">'+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
+h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+(climbers.includes(id)?' <span class="climber-mark" title="Moved up last round — wins ties">↑</span>':'')+'</span><span class="sb-pts">'+(s.rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
 });
 h+='</div>';
 }
@@ -1068,7 +1075,7 @@ if(refocus){refocus.focus();try{refocus.setSelectionRange(selStart,selEnd);}catc
 });
 
 const fb=el('finalise-btn');
-if(fb)fb.addEventListener('click',finaliseSession);
+if(fb)fb.addEventListener('click',confirmEndSession);
 const ab=el('advance-round-btn');
 if(ab)ab.addEventListener('click',advanceRound);
 const cb=el('cancel-session-btn');
@@ -1081,7 +1088,7 @@ const court=S.activeSession?.courts[ci];if(!court)return;
 const name=nameOf(pid);
 const scored=court.games.filter(g=>g.s1!==null&&g.s2!==null).length;
 const left=court.players.length-1;
-confirmDanger({
+confirmDialog({
 title:'Remove '+name+' from the session?',
 body:'<strong>'+esc(name)+'</strong> leaves Court '+(ci+1)+' and the court\'s games are rebuilt for '+left+' player'+(left===1?'':'s')+'.'
 +(scored?' <strong>'+(scored>1?'All '+scored+' scores':'The score')+' entered on Court '+(ci+1)+' will be cleared.</strong>':'')
@@ -1119,12 +1126,17 @@ g.pair2.forEach(id=>ptMap[id]=(ptMap[id]||0)+g.s2);
 if(g.s1>g.s2)g.pair1.forEach(id=>winMap[id]++);else g.pair2.forEach(id=>winMap[id]++);
 }
 });
+// Order: wins (when ranking by wins) → points → a player who moved up into this court last round
+// beats one who was already here (the climber stays up) → current ladder rank.
+const climbers=court.climbers||[];
 const ranked=[...court.players].sort((a,b)=>{
 if(rankBasis==='wins'){
 const dw=(winMap[b]||0)-(winMap[a]||0);
 if(dw!==0)return dw;
 }
-const d=(ptMap[b]||0)-(ptMap[a]||0);return d!==0?d:gp(a).rank-gp(b).rank;
+const d=(ptMap[b]||0)-(ptMap[a]||0);if(d!==0)return d;
+const dc=climbers.includes(b)-climbers.includes(a);if(dc!==0)return dc;
+return gp(a).rank-gp(b).rank;
 });
 return{ranked,ptMap,winMap,players:court.players};
 }
@@ -1194,9 +1206,13 @@ if(vr===undefined)return;
 const ci=rankToCourtIdx[vr];
 if(ci!==undefined)buckets[ci].push(id);
 });
+// remember who came up from a lower court — they win ties in the new round (see tallyCourt)
+const prevCourtOf={};
+session.courts.forEach((c,ci)=>c.players.forEach(id=>prevCourtOf[id]=ci));
 return buckets.map((ids,ci)=>{
 const sorted=[...ids].sort((a,b)=>virtualRanks[a]-virtualRanks[b]);
-return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21};
+const climbers=sorted.filter(id=>prevCourtOf[id]>ci);
+return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21,climbers};
 });
 }
 
@@ -1229,7 +1245,7 @@ const total=s.courts.reduce((sum,c)=>sum+c.games.length,0);
 const body=scored
 ?'<strong>Round '+n+'</strong> is in progress ('+scored+' of '+total+' games scored). Removing it <strong>discards those scores</strong> and reopens Round '+(n-1)+' (its scores are kept).'
 :'<strong>Round '+n+'</strong> has no scores yet. Removing it reopens Round '+(n-1)+', so you can end the session from there.';
-confirmDanger({
+confirmDialog({
 title:'Remove Round '+n+'?',body,
 confirmWord:'REMOVE',confirmLabel:scored?'Discard & remove':'Remove round',cancelLabel:'Keep round',
 onConfirm:()=>{
@@ -1251,6 +1267,22 @@ save();renderSession();toast('Round '+removed+' removed');
 }
 
 // ── Finalise ──────────────────────────────────────────────────────────
+function confirmEndSession(){
+const s=S.activeSession;if(!s)return;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');return;}
+const n=s.round;
+confirmDialog({
+title:'End today\'s session?',
+body:'The session ends after <strong>'+n+' round'+(n>1?'s':'')+'</strong> and the ladder is updated for the '+s.attending.length+' players who played.'
++(s.skipped.length?' '+s.skipped.length+' absent player'+(s.skipped.length>1?'s drop':' drops')+' 2 places.':'')
++' Want to keep playing? Choose <strong>+ Add Round '+(n+1)+'</strong> instead.',
+confirmLabel:'End session & update ladder',cancelLabel:'Not yet',
+onConfirm:()=>{
+if(S.activeSession?.round!==n){toast('Session changed — not ended');render();return;}
+finaliseSession();
+}
+});
+}
 function finaliseSession(){
 if(!CAN_EDIT){toast('Only a team admin can finish the session');return;}
 const s=S.activeSession;
@@ -1303,7 +1335,7 @@ function cancelSession(){
 if(!CAN_EDIT){toast('Only a team admin can cancel the session');return;}
 const s=S.activeSession;if(!s)return;
 if(cancelBlockReason(s)){toast('Scores are entered — session can\'t be cancelled');renderSession();return;}
-confirmDanger({
+confirmDialog({
 title:'Cancel this session?',
 body:'The <strong>'+esc(s.date)+'</strong> session ('+s.attending.length+' players, '+s.courts.length+' court'+(s.courts.length>1?'s':'')+') will be thrown away. Nothing is added to History and the ladder stays as it is.',
 confirmWord:'CANCEL',confirmLabel:'Cancel session',cancelLabel:'Keep session',
@@ -1508,7 +1540,7 @@ r.readAsText(f);
 on('import-btn',()=>{
 let d;try{d=JSON.parse(el('import-json').value);}catch(e){toast('That is not valid JSON');return;}
 if(!d||!Array.isArray(d.players)||!Array.isArray(d.sessions)){toast('JSON needs "players" and "sessions" lists');return;}
-confirmDanger({
+confirmDialog({
 title:'Replace all data?',
 body:'All current data — <strong>'+S.players.length+' players, '+S.sessions.length+' sessions'+(S.activeSession?' and the active session':'')+'</strong> — is replaced with the backup\'s <strong>'+d.players.length+' players and '+d.sessions.length+' sessions</strong>. This cannot be undone.',
 confirmWord:'REPLACE',confirmLabel:'Replace data',cancelLabel:'Keep current data',
@@ -1554,7 +1586,7 @@ const ls=S.sessions[S.sessions.length-1];if(!ls)return;
 const note=!ls.ranksAfter?' This session has no saved rank snapshot, so only wins/losses/points are reverted — ranks stay as they are.'
 :ladderDriftedSince(ls)?' ⚠ The ladder has changed since (ranks edited or players added/removed), so restored ranks may not be exact.'
 :' Rankings go back to how they were before it.';
-confirmDanger({
+confirmDialog({
 title:'Delete this session?',
 body:'The <strong>'+esc(ls.date)+'</strong> session is removed from History and its wins, losses and points are taken off the ladder.'+note+' This cannot be undone.',
 confirmWord:ls.date,confirmLabel:'Delete session',cancelLabel:'Keep session',

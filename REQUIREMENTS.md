@@ -31,12 +31,12 @@ Items are grouped so related changes ship together. Original request numbers are
 | C2 [5] | Score entry **cannot exceed the max score — deuce allowed**. | ⬜ | Badminton rules: first to max wins; at (max−1)-all, play on until 2 clear; hard cap at 30 (21-pt games) / 20 (15-pt games — confirm cap). Reject invalid scores (ties, winner below max, loser too close, over cap). |
 | C3 [6] | Scores can be entered **right team first** (right-to-left) as well as left first. | ⬜ | Entering the right-hand box first must not save, re-render or steal focus until both boxes are filled; tab/"next" order follows whichever box was typed first. |
 
-## D. Ranking rules
+## D. Ranking rules — ✅ done
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| D1 [8] | Default ranking within a court = **Wins, then Points**; toggle for **Points only**. | ⬜ | Today the default is `'points'`. Flip default; keep toggle in setup. |
-| D2 [7] | **Tie-break at the promotion/relegation line.** Example 5-player court: A 53, B 55, C 52, D 52, E 50 → E is relegated outright; C vs D tie is decided in favour of **the player who moved up into this court last round** (the climber stays up). | ⬜ | Current tie-break = better existing ladder rank. New order: wins (when D1 applies) → points → **climber first** → existing ladder rank. In Round 1 nobody has "moved up", so it falls back to ladder rank. Needs per-round movement recorded on each court. |
+| D1 [8] | Default ranking within a court = **Wins, then Points**; toggle for **Points only**. | ✅ | Setup defaults to "Wins then Points"; "Points only" is the alternative. Live standings and round summaries show wins when they count. |
+| D2 [7] | **Tie-break at the promotion/relegation line.** Example 5-player court: A 53, B 55, C 52, D 52, E 50 → E is relegated outright; C vs D tie is decided in favour of **the player who moved up into this court last round** (the climber stays up). | ✅ | `tallyCourt()` order: wins (when D1 applies) → points → **climber first** → current ladder rank. `regroupForNextRound()` records `court.climbers`; Round 1 has none, so it falls back to ladder rank. Climbers show a ↑ in live standings. Applies to every tie in the court, not only at the relegation line. |
 
 ## E. Ladder
 
@@ -60,6 +60,8 @@ Items are grouped so related changes ship together. Original request numbers are
 
 ## Decisions log
 
+- **B** — "End Today's Session" asks for a simple one-step confirmation (not type-to-confirm — it isn't a deletion).
+
 - **A1** — Any score, current or earlier round, blocks Cancel.
 - **C2** — Deuce is allowed.
 - **C3** — "RTL" means entering the right-hand team's score first.
@@ -75,7 +77,7 @@ Items are grouped so related changes ship together. Original request numbers are
 
 1. ~~**A** (safety)~~ ✅
 2. ~~**B** (round flow)~~ ✅
-3. **D** (ranking rules).
+3. ~~**D** (ranking rules)~~ ✅
 4. **C** (scoring UX / court tabs).
 5. **E** (ladder history).
 6. **F** (share URL) — needs a DB migration.
