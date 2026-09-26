@@ -15,13 +15,13 @@ Items are grouped so related changes ship together. Original request numbers are
 | A3 [10] | **Remove Round** and **Cancel Session** not easily reachable. | ✅ | Moved into a collapsed "⋯ More options" section under the main button. Hidden for scorers and viewers. |
 | A4 [12] | **All deletions need a 2-step check.** | ✅ | `confirmDanger()`: step 1 dialog explains the impact, step 2 the button unlocks only after typing the confirm word. Used for: cancel session (`CANCEL`), remove round (`REMOVE`), delete history session (session date), remove player (player name), remove player from session (player name), replace data from backup (`REPLACE`). |
 
-## B. Round flow
+## B. Round flow — ✅ done
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| B1 [3] | A session **always starts with 1 round**. At the end of each round: **Add another round** or **End session**. | ⬜ | Drop the "Number of Rounds" input from setup; `numRounds` becomes open-ended. "Remove Round" becomes "Undo last round". |
-| B2 [9] | Rename **"Finalise & Update Rankings" → "End Today's Session"**. | ⬜ | Copy change; ties in with B1. |
-| B3 [7b] | From Round 2 on, **previous round results / session summary go at the bottom**, not the top. | ⬜ | Currently "Previous Rounds" renders above the courts. Move below and make it collapsible. |
+| B1 [3] | A session **always starts with 1 round**. At the end of each round: **Add another round** or **End session**. | ✅ | "Number of Rounds" removed from setup. Once every game is scored: **+ Add Round N+1** or **🏁 End Today's Session**. "Remove Round N" (in More options) discards the current round and reopens the previous one. `numRounds` is kept equal to the rounds played (Code.gs export reads it). |
+| B2 [9] | Rename **"Finalise & Update Rankings" → "End Today's Session"**. | ✅ | |
+| B3 [7b] | From Round 2 on, **previous round results / session summary go at the bottom**, not the top. | ✅ | "Session so far" under the action buttons: each finished round's final standings per court (newest first) with ▲/▼ tags showing where each player went; game scores in a collapsible. |
 
 ## C. Scoring UX
 
@@ -74,7 +74,7 @@ Items are grouped so related changes ship together. Original request numbers are
 ## Order
 
 1. ~~**A** (safety)~~ ✅
-2. **B** (round flow) — changes the session model; do before C so tabs are built on the new flow.
+2. ~~**B** (round flow)~~ ✅
 3. **D** (ranking rules).
 4. **C** (scoring UX / court tabs).
 5. **E** (ladder history).

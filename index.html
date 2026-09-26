@@ -59,6 +59,12 @@ outline:none;cursor:pointer;flex-shrink:0;
 .more-menu summary::-webkit-details-marker{display:none;}
 .more-menu-body{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;}
 .more-menu-hint{font-size:11px;color:var(--muted);line-height:1.5;max-width:420px;}
+/* Finished rounds, summarised under the current round */
+.round-summary{padding:12px 14px;}
+.round-summary-title{font-size:12px;font-weight:700;color:var(--green);letter-spacing:.5px;margin-bottom:4px;}
+.round-summary-court{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;}
+.round-games{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+.round-games summary{cursor:pointer;font-size:12px;color:var(--muted);}
 /* Session */
 .session-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
 .session-title{font-size:15px;font-weight:700;margin-bottom:4px;}
@@ -699,12 +705,12 @@ save();renderPlayers();toast(target.name+' moved to #'+newRank);
 }
 
 // ── Session setup ─────────────────────────────────────────────────────
-let setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+let setup={attending:new Set(),numCourts:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
 function openSessionModal(){
 if(!CAN_EDIT){toast('View-only account');return;}
 if(S.activeSession){toast('Finish the active session first');showTab('session');return;}
 if(S.players.length<4){toast('Add at least 4 players first');return;}
-setup={attending:new Set(),numCourts:2,numRounds:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
+setup={attending:new Set(),numCourts:2,rankBasis:'points',splitMode:'auto',customSizes:[]};
 buildModal();
 }
 function buildModal(){
@@ -713,7 +719,7 @@ const m=document.createElement('div');
 m.className='modal-bg';m.id='setup-modal';
 let g=sorted.map(p=>'<div class="player-check" data-pid="'+p.id+'"><div class="check-name">'+p.name+'</div><div class="check-rank">#'+p.rank+'</div></div>').join('');
 let rb=[{v:'points',l:'Points'},{v:'wins',l:'Wins then Points'}].map(o=>'<button class="score-opt'+(setup.rankBasis===o.v?' active':'')+'" data-rankbasis="'+o.v+'">'+o.l+'</button>').join('');
-m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div><div><div class="section-label" style="margin-bottom:7px;">Number of Rounds</div><input type="number" id="rounds-input" class="add-input" style="max-width:90px;" min="1" max="10" value="'+setup.numRounds+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
+m.innerHTML='<div class="modal"><button id="modal-close-btn" class="modal-close">✕</button><div class="modal-title">New Session (Doubles)</div><div class="modal-sub">Who\'s playing today?</div><div class="player-grid" id="attend-grid">'+g+'</div><div style="display:flex;gap:14px;margin-bottom:14px;"><div><div class="section-label" style="margin-bottom:7px;">Number of Courts</div><input type="number" id="courts-input" class="add-input" style="max-width:90px;" min="1" max="12" value="'+setup.numCourts+'"></div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Ranking Basis (within a court)</div><div style="display:flex;gap:7px;" id="rankbasis-row">'+rb+'</div></div><div style="margin-bottom:14px;"><div class="section-label" style="margin-bottom:7px;">Players per Court</div><div style="display:flex;gap:7px;margin-bottom:9px;" id="split-row">'+[{v:'auto',l:'Auto'},{v:'custom',l:'Custom'}].map(o=>'<button class="score-opt'+(setup.splitMode===o.v?' active':'')+'" data-split="'+o.v+'">'+o.l+'</button>').join('')+'</div><div id="custom-sizes" style="display:flex;flex-wrap:wrap;gap:10px;"></div></div><div id="modal-preview" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div><div class="btn-row"><button class="btn btn-primary" id="start-session-btn">Start Session</button><button class="btn btn-outline" id="cancel-modal-btn">Cancel</button></div></div>';
 document.body.appendChild(m);
 m.querySelectorAll('.player-check').forEach(c=>{
 c.addEventListener('click',()=>{
@@ -726,10 +732,6 @@ updatePreview();
 el('courts-input').addEventListener('input',()=>{
 setup.numCourts=Math.max(1,parseInt(el('courts-input').value)||1);
 renderCustomSizes();updatePreview();
-});
-el('rounds-input').addEventListener('input',()=>{
-setup.numRounds=Math.max(1,parseInt(el('rounds-input').value)||1);
-updatePreview();
 });
 m.querySelectorAll('[data-rankbasis]').forEach(b=>{
 b.addEventListener('click',()=>{
@@ -786,7 +788,7 @@ const pv=el('modal-preview');if(!pv)return;
 const sizes=sessionSizes();
 const err=sizesError(n,sizes);
 if(err){pv.textContent=err;return;}
-pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · '+setup.numRounds+' round'+(setup.numRounds>1?'s':'')+' · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
+pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' players'+(g>4?' ('+(g-4)+' sit'+(g===5?'s':'')+' out each game)':'')).join(', ')+' · starts with Round 1 · ranked by '+(setup.rankBasis==='wins'?'wins':'points');
 }
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
@@ -869,7 +871,7 @@ const courts=buildCourts(att,sizes);
 const bands=courts.map(c=>c.players.map(id=>gp(id).rank).sort((a,b)=>a-b));
 S.activeSession={
 date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
-numRounds:setup.numRounds,
+numRounds:1, // grows as rounds are added; always equals round
 rankBasis:setup.rankBasis,
 round:1,
 bands:bands,
@@ -882,6 +884,35 @@ save();closeModal();showTab('session');toast('Session started! 🏸');
 }
 
 // ── Session render ────────────────────────────────────────────────────
+// "Session so far": each finished round's final standings per court (newest first), with where
+// each player went next round; the game-by-game scores are tucked into a collapsible.
+function roundSummaryHtml(s){
+if(!s.rounds.length)return'';
+let h='<div class="section-label" style="margin-top:22px;">Session so far</div>';
+[...s.rounds].map((r,ri)=>({r,ri})).reverse().forEach(({r,ri})=>{
+const next=(s.rounds[ri+1]||{courts:s.courts}).courts;
+const courtOf={};next.forEach((c,ci)=>c.players.forEach(id=>courtOf[id]=ci));
+h+='<div class="card round-summary"><div class="round-summary-title">Round '+(ri+1)+' result</div>';
+r.courts.forEach((c,ci)=>{
+const{ranked,ptMap,winMap}=tallyCourt(c,s.rankBasis);
+h+='<div class="round-summary-court">Court '+(ci+1)+'</div>';
+ranked.forEach((id,i)=>{
+const to=courtOf[id];
+const tag=to===undefined||to===ci?'':to<ci?'<span class="sb-tag tag-up">▲ Court '+(to+1)+'</span>':'<span class="sb-tag tag-down">▼ Court '+(to+1)+'</span>';
+h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+'</span><span class="sb-pts">'+(s.rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
+});
+});
+h+='<details class="round-games"><summary>Game scores</summary>';
+r.courts.forEach((c,ci)=>{
+h+='<div style="font-size:12px;margin:8px 0 3px;"><strong>Court '+(ci+1)+'</strong></div>';
+c.games.forEach((g,gi)=>{
+h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>esc(nameOf(id))).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>esc(nameOf(id))).join(' & ')+(g.sitOut?' <em>(sitting: '+esc(sitOutNames(g))+')</em>':'')+'</div>';
+});
+});
+h+='</details></div>';
+});
+return h;
+}
 function renderSession(){
 const root=el('tab-session');
 if(!S.activeSession){
@@ -895,24 +926,9 @@ const allDone=doneG===totalG;
 const pct=totalG?Math.round(doneG/totalG*100):0;
 
 let h='<div class="session-panel">'
-+'<div class="session-title">Session — '+s.date+' · Round '+s.round+' of '+s.numRounds+'</div>'
++'<div class="session-title">Session — '+s.date+' · Round '+s.round+'</div>'
 +'<div class="session-meta">'+s.courts.length+' court'+(s.courts.length>1?'s':'')+' · '+s.attending.length+' playing · '+doneG+'/'+totalG+' games scored</div>'
 +'<div class="progress-wrap"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
-
-if(s.rounds.length){
-h+='<div class="section-label" style="margin-top:4px;">Previous Rounds</div>';
-s.rounds.forEach((r,ri)=>{
-h+='<div class="card" style="margin-bottom:10px;"><div style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:6px;">Round '+(ri+1)+'</div>';
-r.courts.forEach((c,ci)=>{
-if(ci>0)h+='<hr class="div">';
-h+='<div style="font-size:12px;margin-bottom:4px;"><strong>Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
-c.games.forEach((g,gi)=>{
-h+='<div style="font-size:11px;color:var(--muted);">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' '+g.s1+'–'+g.s2+' '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
-});
-});
-h+='</div>';
-});
-}
 
 s.courts.forEach((court,ci)=>{
 const{ranked,ptMap}=tallyCourt(court,s.rankBasis);
@@ -973,18 +989,18 @@ if(s.skipped.length){
 h+='<div style="background:var(--red-dim);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;">⚠ Skipped today (−2 ranks): <strong>'+s.skipped.map(id=>nameOf(id)).join(', ')+'</strong></div>';
 }
 
-const isLastRound=s.round>=s.numRounds;
-const btnLabel=isLastRound?'Finalise &amp; Update Rankings':'Complete Round '+s.round+' → Start Round '+(s.round+1);
-const btnId=isLastRound?'finalise-btn':'advance-round-btn';
+// Rounds are open-ended: once every game of this round is scored, add another round or end the session
 const cancelBlocked=cancelBlockReason(s);
 h+='<div class="btn-row">'
-+'<button class="btn btn-primary" id="'+btnId+'"'+(allDone?'':' disabled')+'>'+btnLabel+'</button>'
++'<button class="btn btn-outline" id="advance-round-btn"'+(allDone?'':' disabled')+'>+ Add Round '+(s.round+1)+'</button>'
++'<button class="btn btn-primary" id="finalise-btn"'+(allDone?'':' disabled')+'>🏁 End Today\'s Session</button>'
 +'</div>'
 +'<div style="font-size:12px;color:'+(allDone?'var(--green)':'var(--muted)')+';margin-top:8px;">'
-+(allDone?(isLastRound?'All games scored — ready to finalise! 🏆':'Round '+s.round+' complete — ready for the next round! 🏸'):(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining.')
++(allDone?'Round '+s.round+' complete — add another round, or end today\'s session to update the ladder. 🏸':(totalG-doneG)+' game'+(totalG-doneG!==1?'s':'')+' remaining in Round '+s.round+'.')
 +'</div>'
++roundSummaryHtml(s)
 +'<details class="more-menu" id="session-more"'+(sessionMoreOpen?' open':'')+'><summary>⋯ More options</summary><div class="more-menu-body">'
-+(s.numRounds>1?'<button class="btn btn-outline" id="remove-round-btn">Remove Round '+s.numRounds+'</button>':'')
++(s.round>1?'<button class="btn btn-outline" id="remove-round-btn">Remove Round '+s.round+'</button>':'')
 +'<button class="btn btn-danger" id="cancel-session-btn"'+(cancelBlocked?' disabled':'')+'>Cancel Session</button>'
 +(cancelBlocked?'<div class="more-menu-hint">'+cancelBlocked+'</div>':'')
 +'</div></details>'
@@ -1188,53 +1204,49 @@ return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?sessi
 function advanceRound(){
 if(!CAN_EDIT){toast('Only a team admin can move to the next round');return;}
 const s=S.activeSession;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');renderSession();return;}
 s.courts.forEach(accumulateStats);
 const virtual=computeRoundVirtualRanks(s.courts,s.bands,s.rankBasis);
 s.rounds.push({courts:s.courts});
 s.courts=regroupForNextRound(s,virtual);
 s.round+=1;
+s.numRounds=s.round;
 save();renderSession();toast('Round '+(s.round-1)+' complete — Round '+s.round+' started! 🏸');
 }
+function roundComplete(s){
+return!!s&&s.courts.every(c=>c.games.every(g=>g.s1!==null&&g.s2!==null));
+}
 
-// ── Remove the last round of the session ────────────────────────────────
-// Case 1: last round hasn't been reached yet  -> just lower numRounds.
-// Case 2: last round is the one on the courts -> discard its scores, reopen the previous
-//         round as the final one (undoing the stats that advanceRound() already booked).
+// ── Remove the current round ────────────────────────────────────────────
+// Discards the round on the courts and reopens the previous one (undoing the stats that
+// advanceRound() booked for it), so the session can carry on or end from there.
 function confirmRemoveRound(){
 const s=S.activeSession;
-if(!s||s.numRounds<=1)return;
-const n=s.numRounds;
+if(!s||s.round<=1)return;
+const n=s.round;
 const scored=s.courts.reduce((sum,c)=>sum+c.games.filter(g=>g.s1!==null&&g.s2!==null).length,0);
 const total=s.courts.reduce((sum,c)=>sum+c.games.length,0);
-const inProgress=n===s.round; // removing the round currently on the courts
-const body=!inProgress
-?'<strong>Round '+n+'</strong> hasn\'t started yet — the session will finish after Round '+(n-1)+'.'
-:scored
-?'<strong>Round '+n+'</strong> is in progress ('+scored+' of '+total+' games scored). Removing it <strong>discards those scores</strong> and reopens Round '+(n-1)+' as the final round (its scores are kept).'
-:'<strong>Round '+n+'</strong> has no scores yet. Removing it reopens Round '+(n-1)+' as the final round.';
+const body=scored
+?'<strong>Round '+n+'</strong> is in progress ('+scored+' of '+total+' games scored). Removing it <strong>discards those scores</strong> and reopens Round '+(n-1)+' (its scores are kept).'
+:'<strong>Round '+n+'</strong> has no scores yet. Removing it reopens Round '+(n-1)+', so you can end the session from there.';
 confirmDanger({
 title:'Remove Round '+n+'?',body,
-confirmWord:'REMOVE',confirmLabel:inProgress&&scored?'Discard & remove':'Remove round',cancelLabel:'Keep round',
+confirmWord:'REMOVE',confirmLabel:scored?'Discard & remove':'Remove round',cancelLabel:'Keep round',
 onConfirm:()=>{
-if(S.activeSession?.numRounds!==n){toast('Session changed — no round removed');render();return;}
+if(S.activeSession?.round!==n){toast('Session changed — no round removed');render();return;}
 removeLastRound();
 }
 });
 }
 function removeLastRound(){
 const s=S.activeSession;
-if(!s||s.numRounds<=1){renderSession();return;}
-const removed=s.numRounds;
-if(s.numRounds>s.round){
-s.numRounds--;
-}else{
-const prev=s.rounds.pop();
+const prev=s&&s.rounds.pop();
 if(!prev){renderSession();return;}
+const removed=s.round;
 prev.courts.forEach(unaccumulateStats);
 s.courts=prev.courts;
 s.round--;
-s.numRounds--;
-}
+s.numRounds=s.round;
 save();renderSession();toast('Round '+removed+' removed');
 }
 
@@ -1242,6 +1254,8 @@ save();renderSession();toast('Round '+removed+' removed');
 function finaliseSession(){
 if(!CAN_EDIT){toast('Only a team admin can finish the session');return;}
 const s=S.activeSession;
+if(!roundComplete(s)){toast('Score every game in Round '+s.round+' first');renderSession();return;}
+s.numRounds=s.round; // sessions started before rounds were open-ended may carry a planned count
 const oldRanks={};S.players.forEach(p=>oldRanks[p.id]=p.rank);
 
 s.courts.forEach(accumulateStats);
