@@ -45,11 +45,12 @@ Items are grouped so related changes ship together. Original request numbers are
 |---|---|---|---|
 | E1 [11] | Ladder shows **history of the last 5 sessions**. | ✅ | Last 5 sessions as columns (oldest → newest): rank after each session, green = climbed, red = dropped, dashed = absent (−2), blank = not on the ladder yet. Hover shows that session's W–L and points. Sessions without a rank snapshot are rebuilt from rank changes and marked ≈. |
 
-## F. Access
+## F. Access — ✅ built (needs migration applied)
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| F1 [13] | Replace the viewer **passcode with a simple shareable URL**. | ⬜ | e.g. `https://<site>/?t=<unguessable-token>` → anonymous sign-in + read-only access. Needs a Supabase migration + RPC. Admin can copy/rotate the link in Members. |
+| F1 [13] | Replace the viewer **passcode with a simple shareable URL**. | ✅ | `…/?join=<token>` → anonymous sign-in + read-only access, token removed from the address bar. Members tab: Copy / Share / Make a new link (type `NEW LINK`; revokes viewers who joined via the old link). Passcode UI removed; its DB functions kept for rollback. **Apply `supabase/migrations/20260927_viewer_share_link.sql`.** |
+| F2 [new] | Server-side badminton score check for scorer saves. | ✅ | **Apply `supabase/migrations/20260927_score_rules.sql`.** |
 
 ## G. Look & feel
 
@@ -81,5 +82,5 @@ _None right now._
 3. ~~**D** (ranking rules)~~ ✅
 4. ~~**C** (scoring UX / court tabs)~~ ✅
 5. ~~**E** (ladder history)~~ ✅
-6. **F** (share URL) — needs a DB migration.
+6. ~~**F** (share URL)~~ ✅ — apply the two 20260927 migrations
 7. **G** (theme) — last, so it restyles the final UI.

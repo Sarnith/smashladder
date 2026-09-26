@@ -51,6 +51,9 @@ header{padding:24px 0 18px;display:flex;align-items:center;justify-content:space
 .lh-cell.none{background:transparent;}
 .lh-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6;}
 .lh-legend .lh-cell{width:22px;height:20px;font-size:10px;cursor:default;}
+/* Share link row (Members tab) */
+.share-row{display:flex;gap:8px;margin-top:12px;}
+.share-row .add-input{flex:1;min-width:0;font-family:'Space Mono',monospace;font-size:12px;}
 /* Remove button */
 .rank-edit-input{
 width:42px;height:42px;text-align:center;
@@ -400,10 +403,10 @@ else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')setSyn
 // ── Sign-in & start-up ────────────────────────────────────────────────
 async function startApp(){
 const{data:{session}}=await SB.auth.getSession();
-if(!session){showLoginGate();return;}
+if(!session){showLoginGate(linkError);linkError='';return;}
 USER=session.user;TOKEN=session.access_token;
 const{data:teams,error:teamError}=await SB.rpc('list_accessible_teams');
-if(teamError||!teams||!teams.length){showNoTeamGate(teamError?.message);return;}
+if(teamError||!teams||!teams.length){showNoTeamGate(teamError?.message||linkError);linkError='';return;}
 TEAMS=teams;
 const remembered=localStorage.getItem('smash_current_team');
 CURRENT_TEAM=TEAMS.find(t=>t.team_id===remembered)||TEAMS[0];
@@ -463,7 +466,7 @@ let actions=action('profile-teams','🏸','Teams','Switch');
 if(CURRENT_TEAM?.app_role==='platform_admin')actions+=action('profile-admin','🛡️','Admin','Platform');
 if(CAN_EDIT)actions+=action('profile-settings','⚙️','Settings','Team');
 actions+='<div class="profile-divider"></div>'+action('profile-logout','↪','Log out','Account','danger');
-const email=USER?.email||'—';
+const email=USER?.email||(USER?.is_anonymous?'Guest viewer':'—');
 m.innerHTML='<div class="profile-summary"><div class="profile-avatar">'+esc(email.charAt(0).toUpperCase())+'</div><div><div class="profile-email">'+esc(email)+'</div><div class="profile-role">'+roleLabel+'</div></div></div><div class="profile-divider"></div>'+actions;
 el('profile-wrap').appendChild(m);
 let onOutside;
@@ -487,22 +490,27 @@ m.querySelectorAll('[data-profile-team-id]').forEach(btn=>btn.addEventListener('
 function showNoTeamGate(msg){
 closeLoginGate();
 const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
-m.innerHTML='<div class="modal"><div class="modal-title">No team access</div><div class="modal-sub">Use a team name and passcode to enter as a viewer.</div>'+(msg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(msg)+'</div>':'')+'<button class="btn btn-primary" id="viewer-entry-btn">Enter a team</button></div>';
-document.body.appendChild(m);el('viewer-entry-btn').addEventListener('click',showViewerGate);
+m.innerHTML='<div class="modal"><div class="modal-title">No team access</div><div class="modal-sub">To watch a team\'s ladder, open the share link from its team admin. Players with an account can sign in instead.</div>'+(msg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(msg)+'</div>':'')+'<button class="btn btn-outline" id="account-signin-btn">Sign in with an account</button></div>';
+document.body.appendChild(m);el('account-signin-btn').addEventListener('click',()=>{closeLoginGate();logout();});
 }
-function showViewerGate(){
-closeLoginGate();
-const m=document.createElement('div');m.className='modal-bg';m.id='login-gate';
-m.innerHTML='<div class="modal"><div class="modal-title">View a team</div><div class="modal-sub">Enter the shared team passcode.</div><input class="add-input" id="viewer-team" placeholder="Team name" style="margin-bottom:8px;width:100%;"><input class="add-input" id="viewer-email" type="email" placeholder="Your email" style="margin-bottom:8px;width:100%;"><input class="add-input" id="viewer-code" placeholder="Team passcode" style="margin-bottom:14px;width:100%;"><div class="btn-row"><button class="btn btn-primary" id="viewer-enter-btn">View ladder</button></div><div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div></div>';
-document.body.appendChild(m);
-el('viewer-enter-btn').addEventListener('click',async()=>{
-const team=el('viewer-team').value.trim(),email=el('viewer-email').value.trim(),code=el('viewer-code').value.trim();
-if(!team||!email||!code)return;
-let{data:{session}}=await SB.auth.getSession();
-if(!session){const r=await SB.auth.signInAnonymously();if(r.error){el('login-err').textContent=r.error.message;return;}}
-const{error}=await SB.rpc('enter_team_as_viewer',{p_team_name:team,p_passcode:code,p_email:email});
-if(error){el('login-err').textContent=error.message;return;}closeLoginGate();await startApp();
-});
+// A share link (?join=<token>) makes this visitor a viewer of that team: sign in anonymously if
+// needed, register the access, and open that team. The token is taken out of the address bar
+// straight away so it isn't bookmarked or copied along with the page URL.
+let linkError='';
+async function joinFromShareLink(){
+const params=new URLSearchParams(location.search);
+const token=params.get('join');
+if(!token)return;
+params.delete('join');
+history.replaceState(null,'',location.pathname+(params.toString()?'?'+params:'')+location.hash);
+const{data:{session}}=await SB.auth.getSession();
+if(!session){
+const r=await SB.auth.signInAnonymously();
+if(r.error){linkError='Could not open the share link: '+r.error.message;return;}
+}
+const{data:teamId,error}=await SB.rpc('enter_team_by_link',{p_token:token});
+if(error){linkError=error.message;return;}
+localStorage.setItem('smash_current_team',teamId);
 }
 function showLoginGate(errMsg){
 closeLoginGate();
@@ -512,8 +520,9 @@ m.innerHTML='<div class="modal"><div class="modal-title">🔒 Sign in</div><div 
 +(errMsg?'<div style="color:var(--red);font-size:12px;margin-bottom:10px;">'+esc(errMsg)+'</div>':'')
 +'<input class="add-input" id="login-email" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px;width:100%;">'
 +'<input class="add-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password" style="margin-bottom:14px;width:100%;">'
-+'<div class="btn-row"><button class="btn btn-primary" id="login-btn">Sign in</button><button class="btn btn-outline" id="viewer-btn">View with team passcode</button></div>'
-+'<div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div></div>';
++'<div class="btn-row"><button class="btn btn-primary" id="login-btn">Sign in</button></div>'
++'<div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;"></div>'
++'<div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.5;">Just want to watch? Open the share link from your team admin — no account needed.</div></div>';
 document.body.appendChild(m);
 const tryLogin=async()=>{
 const email=el('login-email').value.trim(),password=el('login-pass').value;
@@ -527,7 +536,6 @@ await startApp();
 toast('Signed in');
 };
 el('login-btn').addEventListener('click',tryLogin);
-el('viewer-btn').addEventListener('click',showViewerGate);
 el('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin();});
 }
 function closeLoginGate(){const m=el('login-gate');if(m)m.remove();}
@@ -1527,15 +1535,35 @@ const ids=(members||[]).map(m=>m.user_id);
 const{data:profiles}=ids.length?await SB.from('user_profiles').select('user_id,email').in('user_id',ids):{data:[]};
 const emailById=Object.fromEntries((profiles||[]).map(p=>[p.user_id,p.email]));
 const canCreateAdmin=CURRENT_TEAM.app_role==='platform_admin';
-let h='<div class="card"><div class="section-label">Team passcode</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Viewers enter <strong>'+esc(CURRENT_TEAM.team_name)+'</strong>, their email, and the shared passcode. It remains available to Team Admins for six hours after it is created or rotated.</div><div class="btn-row"><button class="btn btn-outline" id="passcode-btn">Show passcode</button><button class="btn btn-outline" id="rotate-passcode-btn">Rotate passcode</button></div><div id="passcode-result" style="margin-top:10px;font-family:Space Mono,monospace;color:var(--green);"></div></div>';
+let h='<div class="card"><div class="section-label">Share link</div><div style="font-size:13px;color:var(--muted);line-height:1.6;">Anyone with this link can watch the ladder and live scores — read-only, no account or passcode needed. Send it in your team chat.</div>'
++'<div class="share-row"><input class="add-input" id="share-link" readonly placeholder="Loading…" aria-label="Share link"><button class="btn btn-primary" id="copy-link-btn" disabled>Copy</button>'+(navigator.share?'<button class="btn btn-outline" id="send-link-btn" disabled>Share</button>':'')+'</div>'
++'<div class="btn-row" style="margin-top:10px;"><button class="btn btn-outline" id="rotate-link-btn">Make a new link</button></div><div id="share-result" style="font-size:12px;margin-top:8px;color:var(--muted);"></div></div>';
 const playerOptions='<option value="">Not linked to a player</option>'+S.players.filter(p=>p.email).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' — '+esc(p.email)+'</option>').join('');
 h+='<div class="card"><div class="section-label">Create account / promote player</div><div class="add-form"><input class="add-input" id="member-email" type="email" placeholder="Email"><select id="member-role" class="add-input" style="max-width:160px;"><option value="scorer">Scoring User</option>'+(canCreateAdmin?'<option value="team_admin">Team Admin</option>':'')+'</select></div><select id="member-player" class="add-input" style="width:100%;margin-bottom:10px;">'+playerOptions+'</select><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="add-input" id="member-password" type="password" minlength="8" placeholder="Temporary password — 8+ characters, or leave blank"></div><button class="btn btn-primary" id="create-member-btn">Create account</button><div id="member-result" style="font-size:12px;margin-top:10px;color:var(--muted);"></div></div>';
 h+='<div class="section-label">Accounts</div>';
 (members||[]).forEach(m=>{h+='<div class="card"><div class="player-row"><div class="rank-num">'+(m.role==='team_admin'?'★':'✎')+'</div><div><div class="player-name">'+esc(emailById[m.user_id]||m.user_id)+'</div><div class="player-stats">'+(m.role==='team_admin'?'Team Admin':'Scoring User')+'</div></div></div></div>';});
 root.innerHTML=h;
-const showPasscode=async rotate=>{const{data,error}=await SB.rpc('create_or_rotate_viewer_passcode',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});el('passcode-result').textContent=error?error.message:(data?'Passcode: '+data:'This passcode is no longer available. Rotate it to generate a new one.');};
-el('passcode-btn').addEventListener('click',()=>showPasscode(false));el('rotate-passcode-btn').addEventListener('click',()=>showPasscode(true));
-showPasscode(false);
+const showShareLink=async rotate=>{
+const{data,error}=await SB.rpc('get_or_rotate_share_link',{p_team_id:CURRENT_TEAM.team_id,p_rotate:rotate});
+if(!el('share-link'))return; // left the tab meanwhile
+if(error){el('share-result').style.color='var(--red)';el('share-result').textContent='Could not load the share link: '+error.message;return;}
+el('share-link').value=location.origin+location.pathname+'?join='+data;
+el('copy-link-btn').disabled=false;if(el('send-link-btn'))el('send-link-btn').disabled=false;
+if(rotate){el('share-result').style.color='var(--green)';el('share-result').textContent='New link ready — the old one no longer works.';}
+};
+el('copy-link-btn').addEventListener('click',async()=>{
+const url=el('share-link').value;
+try{await navigator.clipboard.writeText(url);}catch(e){el('share-link').select();document.execCommand('copy');}
+toast('Link copied');
+});
+if(el('send-link-btn'))el('send-link-btn').addEventListener('click',()=>navigator.share({title:CURRENT_TEAM.team_name+' — Smash Ladder',url:el('share-link').value}).catch(()=>{}));
+el('rotate-link-btn').addEventListener('click',()=>confirmDialog({
+title:'Make a new share link?',
+body:'The current link <strong>stops working</strong>, and everyone who joined through it loses access until you send them the new link. Team admins and scorers are not affected.',
+confirmWord:'NEW LINK',confirmLabel:'Make new link',cancelLabel:'Keep current link',
+onConfirm:()=>showShareLink(true)
+}));
+showShareLink(false);
 el('member-player').addEventListener('change',()=>{const p=gp(el('member-player').value);if(p?.email)el('member-email').value=p.email;});
 el('create-member-btn').addEventListener('click',async()=>{
 const email=el('member-email').value.trim(),password=el('member-password').value;
@@ -1809,7 +1837,7 @@ if(document.hidden){flushOnHide();return;}
 if(USER&&!(CAN_EDIT&&localStorage.getItem(DIRTY_KEY)))refreshFromCloud();
 });
 window.addEventListener('pagehide',flushOnHide);
-startApp();
+joinFromShareLink().then(startApp).then(()=>{if(linkError){toast(linkError);linkError='';}});
 }else{
 render();
 }
