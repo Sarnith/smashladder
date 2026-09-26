@@ -52,11 +52,11 @@ Items are grouped so related changes ship together. Original request numbers are
 | F1 [13] | Replace the viewer **passcode with a simple shareable URL**. | ✅ | `…/?join=<token>` → anonymous sign-in + read-only access, token removed from the address bar. Members tab: Copy / Share / Make a new link (type `NEW LINK`; revokes viewers who joined via the old link). Passcode UI removed; its DB functions kept for rollback. **Apply `supabase/migrations/20260927_viewer_share_link.sql`.** |
 | F2 [new] | Server-side badminton score check for scorer saves. | ✅ | **Apply `supabase/migrations/20260927_score_rules.sql`.** |
 
-## G. Look & feel
+## G. Look & feel — ✅ done
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| G1 [14] | **Light and dark themes with a better colour palette.** | ⬜ | Follow the OS setting by default, with a manual toggle (remembered per device). Rework the palette into tokens so both themes stay readable (scores, win/loss, medals, danger). |
+| G1 [14] | **Light and dark themes with a better colour palette.** | ✅ | **Profile → Theme**: 4 palettes (Court green, Night match, Arena indigo, Clay court) × System / Light / Dark, remembered per device and applied before first paint. Colours are role tokens (`--accent`, `--on-accent`, `--up`, `--red`, medals…) so wins/climbs stay green and drops red in every theme. |
 
 ---
 
@@ -69,7 +69,7 @@ Items are grouped so related changes ship together. Original request numbers are
 - **C3** — "RTL" means entering the right-hand team's score first.
 - **D2** — Tie at the relegation line: the player who moved up into this court last round stays up.
 - **E1** — Last 5 sessions as columns on the ladder.
-- **G1** — Light + dark themes and a better palette.
+- **G1** — All four palettes offered as themes in Profile, each with light/dark; default Court green + follow system.
 
 ## Open questions
 
@@ -83,4 +83,4 @@ _None right now._
 4. ~~**C** (scoring UX / court tabs)~~ ✅
 5. ~~**E** (ladder history)~~ ✅
 6. ~~**F** (share URL)~~ ✅ — apply the two 20260927 migrations
-7. **G** (theme) — last, so it restyles the final UI.
+7. ~~**G** (theme)~~ ✅
