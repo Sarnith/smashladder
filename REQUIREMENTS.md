@@ -28,7 +28,7 @@ Items are grouped so related changes ship together. Original request numbers are
 | # | Requirement | Status | Notes |
 |---|---|---|---|
 | C1 [4] | **Courts as tabs** — more intuitive, easier for multiple scorers (each scorer sits on their court). | ✅ | Sticky court tab bar with per-court progress (`2/5`, `✓` when done); only the selected court renders. Selection remembered per device. |
-| C2 [5] | Score entry **cannot exceed the max score — deuce allowed**. | ✅ | `scoreError()`: first to max; at (max−1)-all play on until 2 clear; hard cap **30** for 21-pt games, **21** for 15-pt games (BWF 15-pt format). Invalid scores aren't saved and show why. Game length can't be switched once a court has scores. |
+| C2 [5] | Score entry **cannot exceed the max score**; deuce is an opt-in per court. | ✅ | Default: games end at exactly 15 / 21 (21–20 is final). Per-court **Deuce Off/On** toggle (carries to the next round): with deuce, at (max−1)-all play on until 2 clear, capped at **30** (21-pt) / **21** (15-pt). Deuce can be turned on any time, but not off once a game went past the length. Invalid scores aren't saved and show why; same rules enforced in the DB migration. |
 | C3 [6] | Scores can be entered **right team first** (right-to-left) as well as left first. | ✅ | Nothing saves until both boxes have a value; Enter jumps to the empty box. |
 | C4 [new] | **Score boxes wait before saving** — the first digit must not save. | ✅ | Typed values are drafts until a 1.5 s pause, leaving the game, or Enter. Drafts survive re-renders and are flushed if the page is hidden. Numeric keypad on phones. "edit" renamed "clear". |
 
@@ -65,7 +65,7 @@ Items are grouped so related changes ship together. Original request numbers are
 - **B** — "End Today's Session" asks for a simple one-step confirmation (not type-to-confirm — it isn't a deletion).
 
 - **A1** — Any score, current or earlier round, blocks Cancel.
-- **C2** — Deuce is allowed. Caps: 30 for 21-pt games, 21 for 15-pt games (decided by Claude, per BWF 15-pt format).
+- **C2** — Hard limit at 15 / 21 by default; deuce is a per-court toggle. Deuce caps: 30 for 21-pt games, 21 for 15-pt games (BWF 15-pt format).
 - **C3** — "RTL" means entering the right-hand team's score first.
 - **D2** — Tie at the relegation line: the player who moved up into this court last round stays up.
 - **E1** — Last 5 sessions as columns on the ladder.

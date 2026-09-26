@@ -98,7 +98,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .court-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
 .pill{font-size:12px;font-weight:600;background:var(--court-line);border:1px solid var(--border);border-radius:20px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px;}
 .pill-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:700;padding:0;line-height:1;}
-.max-score-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--muted);}
+.max-score-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--muted);}
 .score-opt{padding:4px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Grotesk',sans-serif;}
 .score-opt.active{background:var(--green);color:var(--court);border-color:var(--green);}
 .game-card{background:var(--court);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
@@ -966,16 +966,20 @@ save();closeModal();showTab('session');toast('Session started! 🏸');
 }
 
 // ── Score entry ───────────────────────────────────────────────────────
-// Badminton scoring: first to the game length wins, but at (length−1)-all play goes on until one
-// side is 2 clear, up to a hard cap where the next point wins (29-all → 30 for 21-point games,
-// 20-all → 21 for 15-point games).
+// Each court plays to its game length (15 or 21). By default the game ends there — 21–20 is a
+// finished game. With deuce on (court.deuce), at (length−1)-all play goes on until one side is 2
+// clear, up to a cap where the next point wins (29-all → 30 for 21-point games, 20-all → 21 for 15).
 const SCORE_CAPS={15:21,21:30};
-function scoreCap(max){return SCORE_CAPS[max]||max+9;}
-// Why s1–s2 can't be a finished game to `max` points, or null when it can.
-function scoreError(s1,s2,max){
-const cap=scoreCap(max),w=Math.max(s1,s2),l=Math.min(s1,s2);
-if(w>cap)return'Scores stop at '+cap+' — at '+(cap-1)+'-all the next point wins.';
+function scoreCap(max,deuce){return deuce?SCORE_CAPS[max]||max+9:max;}
+// Why s1–s2 can't be a finished game under this court's rules, or null when it can.
+function scoreError(s1,s2,max,deuce){
+const cap=scoreCap(max,deuce),w=Math.max(s1,s2),l=Math.min(s1,s2);
 if(w===l)return'A game can\'t end level.';
+if(!deuce){
+if(w!==max)return'Games on this court end at exactly '+max+' (deuce is off).';
+return null;
+}
+if(w>cap)return'Scores stop at '+cap+' — at '+(cap-1)+'-all the next point wins.';
 if(w<max)return'The winning side needs '+max+' points.';
 if(w===max&&l>max-2)return'At '+(max-1)+'-all play on until one side is 2 clear (e.g. '+(max+1)+'–'+(max-1)+').';
 if(w>max&&l!==w-2&&!(w===cap&&l===cap-1))return'Past '+max+' a game ends 2 clear (e.g. '+(max+2)+'–'+max+') or at '+cap+'–'+(cap-1)+'.';
@@ -1027,7 +1031,7 @@ const v1=d1!==undefined?d1:String(game.s1??''),v2=d2!==undefined?d2:String(game.
 if(v1===''||v2==='')return; // wait for the other box
 const s1=Number(v1),s2=Number(v2);
 if(s1===game.s1&&s2===game.s2){clearScoreDraft(gk);return;}
-const err=scoreError(s1,s2,court.maxScore);
+const err=scoreError(s1,s2,court.maxScore,court.deuce);
 if(err){scoreErrors[gk]=err;rerenderSessionKeepingFocus();return;}
 if(!CAN_EDIT&&CAN_SCORE){
 const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
@@ -1105,10 +1109,11 @@ const{ranked,ptMap,winMap}=tallyCourt(court,s.rankBasis);
 const climbers=court.climbers||[];
 const numCourts=s.courts.length;
 const courtScored=court.games.some(g=>g.s1!==null&&g.s2!==null);
+const pastLength=court.games.some(g=>g.s1!==null&&g.s2!==null&&Math.max(g.s1,g.s2)>court.maxScore);
 
 h+='<div class="court-block">'
 +'<div class="court-hdr"><span class="court-lbl">🏸 Court '+(ci+1)+(ci===0&&numCourts>1?' (Top)':ci===numCourts-1&&numCourts>1?' (Bottom)':'')+'</span>'
-+'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games · to '+court.maxScore+' (max '+scoreCap(court.maxScore)+')</span></div>';
++'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games · to '+court.maxScore+(court.deuce?' (deuce, max '+scoreCap(court.maxScore,true)+')':', no deuce')+'</span></div>';
 
 // Pills with remove buttons
 h+='<div class="court-pills">';
@@ -1120,6 +1125,11 @@ h+='</div>';
 
 h+='<div class="max-score-row">Max score: '
 +[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'"'+(courtScored&&court.maxScore!==n?' disabled title="Clear this court\'s scores to change the game length"':'')+'>'+n+'</button>').join('')
++'<span style="margin-left:10px;">Deuce:</span>'
++[{v:false,l:'Off'},{v:true,l:'On'}].map(o=>{
+const locked=!o.v&&court.deuce&&pastLength; // switching off would invalidate games already past the length
+return'<button class="score-opt'+(!!court.deuce===o.v?' active':'')+'" data-ci="'+ci+'" data-deuce="'+(o.v?1:0)+'"'+(locked?' disabled title="A game on this court went past '+court.maxScore+'"':'')+'>'+o.l+'</button>';
+}).join('')
 +'</div>';
 
 court.games.forEach((game,gi)=>{
@@ -1202,6 +1212,15 @@ confirmRemoveFromSession(Number(btn.dataset.ci),Number(btn.dataset.pid));
 });
 });
 
+root.querySelectorAll('[data-deuce]').forEach(btn=>{
+btn.addEventListener('click',()=>{
+const court=S.activeSession.courts[Number(btn.dataset.ci)];
+const on=btn.dataset.deuce==='1';
+if(!on&&court.games.some(g=>g.s1!==null&&g.s2!==null&&Math.max(g.s1,g.s2)>court.maxScore))return;
+court.deuce=on;
+save();renderSession();
+});
+});
 root.querySelectorAll('[data-ms]').forEach(btn=>{
 btn.addEventListener('click',()=>{
 const court=S.activeSession.courts[Number(btn.dataset.ci)];
@@ -1389,7 +1408,7 @@ session.courts.forEach((c,ci)=>c.players.forEach(id=>prevCourtOf[id]=ci));
 return buckets.map((ids,ci)=>{
 const sorted=[...ids].sort((a,b)=>virtualRanks[a]-virtualRanks[b]);
 const climbers=sorted.filter(id=>prevCourtOf[id]>ci);
-return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21,climbers};
+return{players:sorted,games:buildGames(sorted),maxScore:session.courts[ci]?session.courts[ci].maxScore:21,deuce:!!(session.courts[ci]&&session.courts[ci].deuce),climbers};
 });
 }
 

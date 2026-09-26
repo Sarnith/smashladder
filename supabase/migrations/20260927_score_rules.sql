@@ -1,6 +1,7 @@
 -- Enforce badminton scoring on scorer saves (the app checks the same rules before sending).
--- First to the court's game length (maxScore, 15 or 21); at (length−1)-all play on until 2 clear,
--- up to a cap where the next point wins: 30 for 21-point games, 21 for 15-point games.
+-- Each court plays to its game length (maxScore, 15 or 21). Deuce off (default): the winner has
+-- exactly the game length. Deuce on (court.deuce): at (length−1)-all play on until 2 clear, up to a
+-- cap where the next point wins — 30 for 21-point games, 21 for 15-point games.
 
 create or replace function public.save_current_game_score(
   p_team_id uuid,
@@ -22,6 +23,7 @@ declare
   v_current_score_2 integer;
   v_max integer;
   v_cap integer;
+  v_deuce boolean;
   v_win integer;
   v_lose integer;
 begin
@@ -43,14 +45,19 @@ begin
   end if;
 
   v_max := coalesce((v_data #>> array['courts', p_court_index::text, 'maxScore'])::integer, 21);
-  v_cap := case v_max when 15 then 21 when 21 then 30 else v_max + 9 end;
+  v_deuce := coalesce((v_data #>> array['courts', p_court_index::text, 'deuce'])::boolean, false);
+  v_cap := case when not v_deuce then v_max when v_max = 15 then 21 when v_max = 21 then 30 else v_max + 9 end;
   v_win := greatest(p_score_1, p_score_2);
   v_lose := least(p_score_1, p_score_2);
-  if v_win > v_cap
+  if v_win = v_lose
+     or (not v_deuce and v_win <> v_max) then
+    raise exception 'Invalid score: %–% is not a finished game to % points', p_score_1, p_score_2, v_max;
+  end if;
+  if v_deuce and (v_win > v_cap
      or v_win = v_lose
      or v_win < v_max
      or (v_win = v_max and v_lose > v_max - 2)
-     or (v_win > v_max and v_lose <> v_win - 2 and not (v_win = v_cap and v_lose = v_cap - 1)) then
+     or (v_win > v_max and v_lose <> v_win - 2 and not (v_win = v_cap and v_lose = v_cap - 1))) then
     raise exception 'Invalid score: %–% is not a finished game to % points', p_score_1, p_score_2, v_max;
   end if;
 
