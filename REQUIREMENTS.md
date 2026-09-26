@@ -23,13 +23,14 @@ Items are grouped so related changes ship together. Original request numbers are
 | B2 [9] | Rename **"Finalise & Update Rankings" → "End Today's Session"**. | ✅ | |
 | B3 [7b] | From Round 2 on, **previous round results / session summary go at the bottom**, not the top. | ✅ | "Session so far" under the action buttons: each finished round's final standings per court (newest first) with ▲/▼ tags showing where each player went; game scores in a collapsible. |
 
-## C. Scoring UX
+## C. Scoring UX — ✅ done
 
 | # | Requirement | Status | Notes |
 |---|---|---|---|
-| C1 [4] | **Courts as tabs** — more intuitive, easier for multiple scorers (each scorer sits on their court). | ⬜ | Court tab bar with per-court progress (e.g. "Court 2 · 3/5"). Remember the selected court per device. |
-| C2 [5] | Score entry **cannot exceed the max score — deuce allowed**. | ⬜ | Badminton rules: first to max wins; at (max−1)-all, play on until 2 clear; hard cap at 30 (21-pt games) / 20 (15-pt games — confirm cap). Reject invalid scores (ties, winner below max, loser too close, over cap). |
-| C3 [6] | Scores can be entered **right team first** (right-to-left) as well as left first. | ⬜ | Entering the right-hand box first must not save, re-render or steal focus until both boxes are filled; tab/"next" order follows whichever box was typed first. |
+| C1 [4] | **Courts as tabs** — more intuitive, easier for multiple scorers (each scorer sits on their court). | ✅ | Sticky court tab bar with per-court progress (`2/5`, `✓` when done); only the selected court renders. Selection remembered per device. |
+| C2 [5] | Score entry **cannot exceed the max score — deuce allowed**. | ✅ | `scoreError()`: first to max; at (max−1)-all play on until 2 clear; hard cap **30** for 21-pt games, **21** for 15-pt games (BWF 15-pt format). Invalid scores aren't saved and show why. Game length can't be switched once a court has scores. |
+| C3 [6] | Scores can be entered **right team first** (right-to-left) as well as left first. | ✅ | Nothing saves until both boxes have a value; Enter jumps to the empty box. |
+| C4 [new] | **Score boxes wait before saving** — the first digit must not save. | ✅ | Typed values are drafts until a 1.5 s pause, leaving the game, or Enter. Drafts survive re-renders and are flushed if the page is hidden. Numeric keypad on phones. "edit" renamed "clear". |
 
 ## D. Ranking rules — ✅ done
 
@@ -63,22 +64,21 @@ Items are grouped so related changes ship together. Original request numbers are
 - **B** — "End Today's Session" asks for a simple one-step confirmation (not type-to-confirm — it isn't a deletion).
 
 - **A1** — Any score, current or earlier round, blocks Cancel.
-- **C2** — Deuce is allowed.
+- **C2** — Deuce is allowed. Caps: 30 for 21-pt games, 21 for 15-pt games (decided by Claude, per BWF 15-pt format).
 - **C3** — "RTL" means entering the right-hand team's score first.
 - **D2** — Tie at the relegation line: the player who moved up into this court last round stays up.
 - **G1** — Light + dark themes and a better palette.
 
 ## Open questions
 
-1. **C2** — For 15-point games, what's the hard cap? (Common choice: 20 — i.e. 20–19 wins.)
-2. **E1** — Rank trend, W/L form, points per session, or a mix?
+1. **E1** — Rank trend, W/L form, points per session, or a mix?
 
 ## Order
 
 1. ~~**A** (safety)~~ ✅
 2. ~~**B** (round flow)~~ ✅
 3. ~~**D** (ranking rules)~~ ✅
-4. **C** (scoring UX / court tabs).
+4. ~~**C** (scoring UX / court tabs)~~ ✅
 5. **E** (ladder history).
 6. **F** (share URL) — needs a DB migration.
 7. **G** (theme) — last, so it restyles the final UI.

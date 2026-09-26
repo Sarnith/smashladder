@@ -65,6 +65,12 @@ outline:none;cursor:pointer;flex-shrink:0;
 .round-summary-court{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;}
 .round-games{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
 .round-games summary{cursor:pointer;font-size:12px;color:var(--muted);}
+/* Court tabs — pinned while scrolling so a scorer can hop between courts */
+.court-tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:12px;}
+.court-tab{flex:1 0 auto;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border:none;border-radius:7px;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.court-tab.active{background:var(--court-line);color:var(--green);}
+.court-tab-prog{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--court-mid);color:var(--yellow);}
+.court-tab.done .court-tab-prog{color:var(--green);}
 /* Session */
 .session-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
 .session-title{font-size:15px;font-weight:700;margin-bottom:4px;}
@@ -98,6 +104,10 @@ outline:none;cursor:pointer;flex-shrink:0;
 .score-input:focus{border-color:var(--green);}
 .score-input.winning{border-color:var(--green);color:var(--green);}
 .score-input.losing{border-color:var(--border);color:var(--muted);}
+.score-input.invalid{border-color:var(--red);color:var(--red);}
+.score-msg{font-size:11px;color:var(--red);text-align:center;line-height:1.4;padding:0 12px;}
+.score-msg:not(:empty){padding:0 12px 9px;}
+.score-opt:disabled{opacity:.35;cursor:not-allowed;}
 .vs-col{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 6px;background:var(--court-mid);border-left:1px solid var(--border);border-right:1px solid var(--border);}
 .vs-text{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);}
 .vs-score{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text);margin-top:4px;}
@@ -281,6 +291,7 @@ function ensureSessionIds(){S.sessions.forEach((s,i)=>{if(!s.id)s.id='s'+Date.no
 // Last-chance save when the tab is hidden or closed. A normal request would be cancelled with the
 // page, so this uses fetch({keepalive:true}) straight to the same push_state function.
 function flushOnHide(){
+flushScoreDrafts(); // a score typed just before hiding is still waiting on its pause timer
 if(!CLOUD||!CAN_EDIT||!TOKEN||!localStorage.getItem(DIRTY_KEY))return;
 clearTimeout(syncTimer);
 const seq=saveSeq;
@@ -874,6 +885,7 @@ const sizes=sessionSizes();
 const err=sizesError(att.length,sizes);
 if(err){toast(err);return;}
 const courts=buildCourts(att,sizes);
+scoreDrafts={};scoreErrors={};
 const bands=courts.map(c=>c.players.map(id=>gp(id).rank).sort((a,b)=>a-b));
 S.activeSession={
 date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
@@ -887,6 +899,84 @@ skipped:S.players.map(p=>p.id).filter(id=>!setup.attending.has(id)),
 attending:att
 };
 save();closeModal();showTab('session');toast('Session started! 🏸');
+}
+
+// ── Score entry ───────────────────────────────────────────────────────
+// Badminton scoring: first to the game length wins, but at (length−1)-all play goes on until one
+// side is 2 clear, up to a hard cap where the next point wins (29-all → 30 for 21-point games,
+// 20-all → 21 for 15-point games).
+const SCORE_CAPS={15:21,21:30};
+function scoreCap(max){return SCORE_CAPS[max]||max+9;}
+// Why s1–s2 can't be a finished game to `max` points, or null when it can.
+function scoreError(s1,s2,max){
+const cap=scoreCap(max),w=Math.max(s1,s2),l=Math.min(s1,s2);
+if(w>cap)return'Scores stop at '+cap+' — at '+(cap-1)+'-all the next point wins.';
+if(w===l)return'A game can\'t end level.';
+if(w<max)return'The winning side needs '+max+' points.';
+if(w===max&&l>max-2)return'At '+(max-1)+'-all play on until one side is 2 clear (e.g. '+(max+1)+'–'+(max-1)+').';
+if(w>max&&l!==w-2&&!(w===cap&&l===cap-1))return'Past '+max+' a game ends 2 clear (e.g. '+(max+2)+'–'+max+') or at '+cap+'–'+(cap-1)+'.';
+return null;
+}
+let courtTab=(()=>{try{return Number(localStorage.getItem('smash_court_tab'))||0;}catch(e){return 0;}})();
+let scoreDrafts={};   // typed-but-unsaved box values, keyed by gameKey()+'|'+pair
+let scoreErrors={};   // gameKey() -> why the typed score was rejected
+const scoreTimers={};
+let sessionRendering=false; // the session DOM is being replaced — ignore the blur that causes
+// Identifies a game by round, court and pairs, so drafts survive re-renders but never leak into
+// a different game after courts are rebuilt.
+function gameKey(s,ci,gi){const g=s.courts[ci].games[gi];return s.round+'|'+ci+'|'+g.pair1.join(',')+'v'+g.pair2.join(',');}
+function clearScoreDraft(gk){delete scoreDrafts[gk+'|1'];delete scoreDrafts[gk+'|2'];delete scoreErrors[gk];}
+function flushScoreDrafts(){
+Object.keys(scoreTimers).forEach(k=>{const[ci,gi]=k.split('-').map(Number);commitScore(ci,gi);});
+}
+function scheduleScoreCommit(ci,gi){
+const k=ci+'-'+gi;
+clearTimeout(scoreTimers[k]);
+scoreTimers[k]=setTimeout(()=>commitScore(ci,gi),1500);
+}
+// Committing a score re-renders the session. When the commit comes from leaving a box, wait until
+// the tap/click that moved focus has finished — otherwise the element being tapped is replaced
+// mid-click and the tap (or the focus it gives) is lost.
+let pointerIsDown=false,afterPointer=[];
+function afterInteraction(fn){if(pointerIsDown)afterPointer.push(fn);else setTimeout(fn,0);}
+document.addEventListener('pointerdown',()=>{pointerIsDown=true;},true);
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>{
+pointerIsDown=false;
+const fns=afterPointer;afterPointer=[];
+setTimeout(()=>fns.forEach(f=>f()),0); // runs after the click event has been dispatched
+},true));
+function rerenderSessionKeepingFocus(){
+if(currentTab!=='session')return;
+const a=document.activeElement,id=a&&a.id,ss=a&&a.selectionStart,se=a&&a.selectionEnd;
+renderSession();
+const r=id&&el(id);
+if(r&&r!==document.activeElement){r.focus();try{r.setSelectionRange(ss,se);}catch(e){}}
+}
+async function commitScore(ci,gi){
+clearTimeout(scoreTimers[ci+'-'+gi]);
+const s=S.activeSession,court=s&&s.courts[ci],game=court&&court.games[gi];
+if(!game)return;
+const gk=gameKey(s,ci,gi);
+const d1=scoreDrafts[gk+'|1'],d2=scoreDrafts[gk+'|2'];
+if(d1===undefined&&d2===undefined)return; // nothing typed
+const v1=d1!==undefined?d1:String(game.s1??''),v2=d2!==undefined?d2:String(game.s2??'');
+if(v1===''||v2==='')return; // wait for the other box
+const s1=Number(v1),s2=Number(v2);
+if(s1===game.s1&&s2===game.s2){clearScoreDraft(gk);return;}
+const err=scoreError(s1,s2,court.maxScore);
+if(err){scoreErrors[gk]=err;rerenderSessionKeepingFocus();return;}
+if(!CAN_EDIT&&CAN_SCORE){
+const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
+if(error){
+if(error.message?.startsWith('Score conflict:')){clearScoreDraft(gk);toast('Score conflict — latest score loaded.');await refreshFromCloud();return;}
+toast('Score not saved: '+error.message);return;
+}
+clearScoreDraft(gk);
+await refreshFromCloud();return;
+}
+game.s1=s1;game.s2=s2;
+clearScoreDraft(gk);
+save();rerenderSessionKeepingFocus();
 }
 
 // ── Session render ────────────────────────────────────────────────────
@@ -936,14 +1026,25 @@ let h='<div class="session-panel">'
 +'<div class="session-meta">'+s.courts.length+' court'+(s.courts.length>1?'s':'')+' · '+s.attending.length+' playing · '+doneG+'/'+totalG+' games scored</div>'
 +'<div class="progress-wrap"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
 
+// One court at a time: each scorer stays on their own court's tab
+const selCourt=Math.min(courtTab,s.courts.length-1);
+if(s.courts.length>1){
+h+='<div class="court-tabs">'+s.courts.map((c,ci)=>{
+const d=c.games.filter(g=>g.s1!==null&&g.s2!==null).length,t=c.games.length,done=t>0&&d===t;
+return'<button class="court-tab'+(ci===selCourt?' active':'')+(done?' done':'')+'" data-court-tab="'+ci+'"><span>Court '+(ci+1)+'</span><span class="court-tab-prog">'+(done?'✓':d+'/'+t)+'</span></button>';
+}).join('')+'</div>';
+}
+
 s.courts.forEach((court,ci)=>{
+if(ci!==selCourt)return;
 const{ranked,ptMap,winMap}=tallyCourt(court,s.rankBasis);
 const climbers=court.climbers||[];
 const numCourts=s.courts.length;
+const courtScored=court.games.some(g=>g.s1!==null&&g.s2!==null);
 
 h+='<div class="court-block">'
 +'<div class="court-hdr"><span class="court-lbl">🏸 Court '+(ci+1)+(ci===0&&numCourts>1?' (Top)':ci===numCourts-1&&numCourts>1?' (Bottom)':'')+'</span>'
-+'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games</span></div>';
++'<span class="court-fmt">'+court.players.length+'p · '+court.games.length+' games · to '+court.maxScore+' (max '+scoreCap(court.maxScore)+')</span></div>';
 
 // Pills with remove buttons
 h+='<div class="court-pills">';
@@ -954,25 +1055,30 @@ h+='<span class="pill">'+nameOf(id)
 h+='</div>';
 
 h+='<div class="max-score-row">Max score: '
-+[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'">'+n+'</button>').join('')
++[15,21].map(n=>'<button class="score-opt'+(court.maxScore===n?' active':'')+'" data-ci="'+ci+'" data-ms="'+n+'"'+(courtScored&&court.maxScore!==n?' disabled title="Clear this court\'s scores to change the game length"':'')+'>'+n+'</button>').join('')
 +'</div>';
 
 court.games.forEach((game,gi)=>{
 const scored=game.s1!==null&&game.s2!==null;
 const w1=scored&&game.s1>game.s2,w2=scored&&game.s2>game.s1;
+const gk=gameKey(s,ci,gi),err=scoreErrors[gk];
+const val=p=>{const d=scoreDrafts[gk+'|'+p];return d!==undefined?d:(p===1?game.s1:game.s2)??'';};
+const box=(p,cls)=>'<input class="score-input'+cls+(err?' invalid':'')+'" id="s-'+ci+'-'+gi+'-'+p+'" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" enterkeyhint="next" placeholder="—" value="'+val(p)+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="'+p+'" aria-label="Score for '+esc(nameOf((p===1?game.pair1:game.pair2)[0]))+' &amp; '+esc(nameOf((p===1?game.pair1:game.pair2)[1]))+'">';
 h+='<div class="game-card">'
 +'<div class="game-card-hdr"><span class="game-num">GAME '+(gi+1)+(game.sitOut?' · '+sitOutNames(game)+' sit'+(Array.isArray(game.sitOut)&&game.sitOut.length>1?'':'s')+' out':'')+'</span>'
 +(scored
-?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">edit</button></span>'
+?'<span class="game-status-done">✓ Scored &nbsp;<button class="edit-btn" data-ci="'+ci+'" data-gi="'+gi+'">clear</button></span>'
 :'<span class="game-status-pending">● Enter score</span>')
 +'</div>'
 +'<div class="game-score-body">'
 +'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair1[1])+'</div>'
-+'<div class="score-inputs"><input class="score-input'+(scored?(w1?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-1" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s1!==null?game.s1:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="1"></div></div>'
++'<div class="score-inputs">'+box(1,scored?(w1?' winning':' losing'):'')+'</div></div>'
 +'<div class="vs-col"><span class="vs-text">VS</span>'+(scored?'<span class="vs-score">'+game.s1+'–'+game.s2+'</span>':'')+'</div>'
 +'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair2[1])+'</div>'
-+'<div class="score-inputs"><input class="score-input'+(scored?(w2?' winning':' losing'):'')+'" id="s-'+ci+'-'+gi+'-2" type="number" min="0" max="'+court.maxScore+'" placeholder="—" value="'+(game.s2!==null?game.s2:'')+'" data-ci="'+ci+'" data-gi="'+gi+'" data-pair="2"></div></div>'
-+'</div></div>';
++'<div class="score-inputs">'+box(2,scored?(w2?' winning':' losing'):'')+'</div></div>'
++'</div>'
++'<div class="score-msg" id="msg-'+ci+'-'+gi+'">'+(err?esc(err):'')+'</div>'
++'</div>';
 });
 
 // Live scoreboard
@@ -1013,10 +1119,15 @@ h+='<div class="btn-row">'
 +'</div></details>'
 +'</div>';
 
-root.innerHTML=h;
+sessionRendering=true;root.innerHTML=h;sessionRendering=false;
 
 // ── Bind all session events ──
 el('session-more').addEventListener('toggle',e=>{sessionMoreOpen=e.target.open;});
+root.querySelectorAll('[data-court-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+courtTab=Number(btn.dataset.courtTab);
+try{localStorage.setItem('smash_court_tab',String(courtTab));}catch(e){}
+renderSession();
+}));
 const rrb=el('remove-round-btn');
 if(rrb)rrb.addEventListener('click',confirmRemoveRound);
 
@@ -1029,7 +1140,9 @@ confirmRemoveFromSession(Number(btn.dataset.ci),Number(btn.dataset.pid));
 
 root.querySelectorAll('[data-ms]').forEach(btn=>{
 btn.addEventListener('click',()=>{
-S.activeSession.courts[Number(btn.dataset.ci)].maxScore=Number(btn.dataset.ms);
+const court=S.activeSession.courts[Number(btn.dataset.ci)];
+if(court.games.some(g=>g.s1!==null&&g.s2!==null))return; // scores were validated against the current length
+court.maxScore=Number(btn.dataset.ms);
 save();renderSession();
 });
 });
@@ -1037,40 +1150,40 @@ save();renderSession();
 root.querySelectorAll('.edit-btn').forEach(btn=>{
 btn.addEventListener('click',()=>{
 const ci=Number(btn.dataset.ci),gi=Number(btn.dataset.gi);
+clearScoreDraft(gameKey(S.activeSession,ci,gi));
 S.activeSession.courts[ci].games[gi].s1=null;
 S.activeSession.courts[ci].games[gi].s2=null;
 save();renderSession();
 });
 });
 
+// Scores are drafts until the game is committed: after a pause in typing, on leaving the game,
+// or on Enter. Either box can be filled first — nothing is saved until both have a value.
 root.querySelectorAll('.score-input').forEach(inp=>{
-inp.addEventListener('input',async()=>{
-const ci=Number(inp.dataset.ci),gi=Number(inp.dataset.gi);
-const v1=el('s-'+ci+'-'+gi+'-1')?.value;
-const v2=el('s-'+ci+'-'+gi+'-2')?.value;
-if(v1===''||v2===''||v1===undefined||v2===undefined)return;
-const s1=parseInt(v1),s2=parseInt(v2);
-if(isNaN(s1)||isNaN(s2))return;
-if(!CAN_EDIT&&CAN_SCORE){
-const game=S.activeSession.courts[ci].games[gi];
-const{error}=await SB.rpc('save_current_game_score',{p_team_id:CURRENT_TEAM.team_id,p_court_index:ci,p_game_index:gi,p_expected_score_1:game.s1,p_expected_score_2:game.s2,p_score_1:s1,p_score_2:s2});
-if(error){
-  if(error.message?.startsWith('Score conflict:')){toast('Score conflict — latest score loaded.');await refreshFromCloud();return;}
-  toast('Score not saved: '+error.message);return;
+const ci=Number(inp.dataset.ci),gi=Number(inp.dataset.gi),p=inp.dataset.pair;
+const partner=el('s-'+ci+'-'+gi+'-'+(p==='1'?'2':'1'));
+inp.addEventListener('focus',()=>inp.select());
+inp.addEventListener('input',()=>{
+const v=inp.value.replace(/\D/g,'').slice(0,2);
+if(v!==inp.value)inp.value=v;
+const gk=gameKey(S.activeSession,ci,gi);
+scoreDrafts[gk+'|'+p]=v;
+if(scoreErrors[gk]){
+delete scoreErrors[gk];
+el('msg-'+ci+'-'+gi).textContent='';
+inp.classList.remove('invalid');if(partner)partner.classList.remove('invalid');
 }
-await refreshFromCloud();return;
-}
-const game=S.activeSession.courts[ci].games[gi];
-const wasScored=game.s1!==null&&game.s2!==null;
-game.s1=s1;
-game.s2=s2;
-save();
-if(!wasScored){
-const focusedId=inp.id,selStart=inp.selectionStart,selEnd=inp.selectionEnd;
-renderSession();
-const refocus=el(focusedId);
-if(refocus){refocus.focus();try{refocus.setSelectionRange(selStart,selEnd);}catch(err){}}
-}
+scheduleScoreCommit(ci,gi);
+});
+inp.addEventListener('keydown',e=>{
+if(e.key!=='Enter')return;
+e.preventDefault();
+if(partner&&partner.value===''){partner.focus();return;}
+inp.blur();
+});
+inp.addEventListener('blur',e=>{
+if(sessionRendering||e.relatedTarget===partner)return; // re-render, or moving to the other box of this game
+afterInteraction(()=>commitScore(ci,gi));
 });
 });
 
@@ -1328,7 +1441,7 @@ save();showTab('ladder');toast('Rankings updated! 🏆');
 function cancelBlockReason(s){
 if(s.rounds&&s.rounds.length)return(s.rounds.length===1?'Round 1 is':'Rounds 1–'+s.rounds.length+' are')+' already complete, so this session can\'t be cancelled — end it instead.';
 const n=s.courts.reduce((sum,c)=>sum+c.games.filter(g=>g.s1!==null||g.s2!==null).length,0);
-if(n)return n+' game'+(n>1?'s have':' has')+' a score. Clear '+(n>1?'them':'it')+' (tap “edit” on the game) to cancel the session.';
+if(n)return n+' game'+(n>1?'s have':' has')+' a score. Clear '+(n>1?'them':'it')+' (tap “clear” on the game) to cancel the session.';
 return null;
 }
 function cancelSession(){
