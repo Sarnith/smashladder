@@ -139,6 +139,8 @@ outline:none;cursor:pointer;flex-shrink:0;
 .rank-edit-input:focus{border-color:var(--accent);color:var(--accent);}
 .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .remove-btn:hover{background:var(--red-dim);}
+.rename-btn{background:transparent;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rename-btn:hover{border-color:var(--accent);color:var(--accent);}
 /* Two-step (type to confirm) dialog for destructive actions */
 .danger-impact{background:var(--red-dim);border:1px solid color-mix(in srgb,var(--red) 40%,transparent);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.55;color:var(--text);margin-bottom:6px;}
 .danger-word{font-family:'Space Mono',monospace;color:var(--red);}
@@ -880,8 +882,8 @@ h+='<div class="section-label" style="margin-bottom:6px;">'+sorted.length+' play
 sorted.forEach(p=>{
 h+='<div class="card"><div class="player-row">'
 +'<input class="rank-edit-input" data-pid="'+p.id+'" value="'+p.rank+'" type="number" min="1" max="'+S.players.length+'" title="Edit rank">'
-+'<div><div class="player-name">'+p.name+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts</div></div>'
-+'<button class="remove-btn" data-pid="'+p.id+'">✕</button>'
++'<div style="min-width:0;"><div class="player-name">'+esc(p.name)+'</div><div class="player-stats">'+p.wins+'W · '+p.losses+'L · '+(p.totalPts||0)+' pts</div></div>'
++'<div style="display:flex;gap:6px;"><button class="rename-btn" data-pid="'+p.id+'" aria-label="Rename '+esc(p.name)+'" title="Rename">✎</button><button class="remove-btn" data-pid="'+p.id+'" aria-label="Remove '+esc(p.name)+'">✕</button></div>'
 +'</div></div>';
 });
 root.innerHTML=h;
@@ -895,6 +897,7 @@ btn.addEventListener('click',()=>{
 showRemovePlayerConfirmation(Number(btn.dataset.pid));
 });
 });
+root.querySelectorAll('.rename-btn').forEach(btn=>btn.addEventListener('click',()=>showRenamePlayer(Number(btn.dataset.pid))));
 
 root.querySelectorAll('.rank-edit-input').forEach(inp=>{
 const apply=()=>{
@@ -908,6 +911,44 @@ inp.addEventListener('blur',apply);
 });
 }
 
+// Stats, games and ranks reference players by id, but each session's rankChanges (the ▲▼ list
+// used by History, the ladder's session columns and "delete latest session") are stored by name —
+// so a rename rewrites those too, or the player would lose that history.
+function renamePlayer(id,newName){
+const p=gp(id);if(!p)return;
+const old=p.name;
+newName=newName.trim().replace(/\s+/g,' ');
+if(!newName||newName===old)return;
+if(S.players.some(x=>x.id!==id&&x.name.toLowerCase()===newName.toLowerCase())){toast('Another player is already called '+newName);return;}
+let moved=0;
+S.sessions.forEach(s=>(s.rankChanges||[]).forEach(r=>{if(r.name===old){r.name=newName;moved++;}}));
+p.name=newName;
+save();render();toast(old+' renamed to '+newName);
+return moved;
+}
+function showRenamePlayer(id){
+const p=gp(id);if(!p)return;
+const m=document.createElement('div');m.className='modal-bg';m.id='rename-modal';
+m.innerHTML='<div class="modal"><button class="modal-close" id="rename-close" aria-label="Close">✕</button><div class="modal-title">Rename player</div><div class="modal-sub">Wins, points, games, ranks and session history all move with the new name.</div>'
++'<input class="add-input" id="rename-input" maxlength="40" autocomplete="off" style="width:100%;" value="'+esc(p.name)+'" aria-label="New name">'
++'<div id="rename-err" style="font-size:12px;color:var(--red);margin-top:6px;"></div>'
++'<div class="btn-row"><button class="btn btn-primary" id="rename-save">Save name</button><button class="btn btn-outline" id="rename-cancel">Cancel</button></div></div>';
+document.body.appendChild(m);
+const inp=el('rename-input'),close=()=>m.remove();
+const saveName=()=>{
+const v=inp.value.trim().replace(/\s+/g,' ');
+if(!v){el('rename-err').textContent='Enter a name.';return;}
+if(S.players.some(x=>x.id!==id&&x.name.toLowerCase()===v.toLowerCase())){el('rename-err').textContent='Another player is already called '+v+'.';return;}
+close();renamePlayer(id,v);
+};
+inp.addEventListener('input',()=>{el('rename-err').textContent='';});
+inp.addEventListener('keydown',e=>{if(e.key==='Enter')saveName();});
+el('rename-save').addEventListener('click',saveName);
+el('rename-cancel').addEventListener('click',close);
+el('rename-close').addEventListener('click',close);
+m.addEventListener('click',e=>{if(e.target===m)close();});
+inp.focus();inp.select();
+}
 function addPlayer(){
 const inp=el('new-name');
 const name=inp.value.trim();if(!name)return;
