@@ -213,6 +213,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .sb-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;}
 .tag-up{background:var(--up-dim);color:var(--up);border:1px solid var(--up);}
 .climber-mark{font-size:11px;color:var(--up);font-weight:700;cursor:help;}
+.tag-same{background:var(--court-mid);color:var(--muted);border:1px solid var(--border);}
 .tag-down{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
 .section-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .add-form{display:flex;gap:8px;margin-bottom:16px;}
@@ -1280,22 +1281,34 @@ save();rerenderSessionKeepingFocus();
 // ── Session render ────────────────────────────────────────────────────
 // "Session so far": each finished round's final standings per court (newest first), with where
 // each player went next round; the game-by-game scores are tucked into a collapsible.
+// One round's final standings per court. `next` (the following round's courts) gives each
+// player's ▲/▼ court move; without it, `finalMove(id)` supplies the tag (their ladder move for the
+// session). Exact ties are listed in the order they actually resolved — by the court they went to
+// next, then `finalRank` — so past sessions read correctly even though the tie rule has changed.
+function roundStandingsHtml(round,rankBasis,next,finalMove,finalRank){
+const courtOf={};(next||[]).forEach((c,ci)=>c.players.forEach(id=>courtOf[id]=ci));
+let h='';
+round.courts.forEach((c,ci)=>{
+const{ranked,ptMap,winMap}=tallyCourt(c,rankBasis);
+ranked.sort((a,b)=>(rankBasis==='wins'?(winMap[b]||0)-(winMap[a]||0):0)||(ptMap[b]||0)-(ptMap[a]||0)
+||(courtOf[a]??ci)-(courtOf[b]??ci)||(finalRank?(finalRank(a)??999)-(finalRank(b)??999):0));
+h+='<div class="round-summary-court">Court '+(ci+1)+'</div>';
+ranked.forEach((id,i)=>{
+let tag='';
+if(next){const to=courtOf[id];if(to!==undefined&&to!==ci)tag=to<ci?'<span class="sb-tag tag-up">▲ Court '+(to+1)+'</span>':'<span class="sb-tag tag-down">▼ Court '+(to+1)+'</span>';}
+else if(finalMove)tag=finalMove(id);
+h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+'</span><span class="sb-pts">'+(rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
+});
+});
+return h;
+}
 function roundSummaryHtml(s){
 if(!s.rounds.length)return'';
 let h='<div class="section-label" style="margin-top:22px;">Session so far</div>';
 [...s.rounds].map((r,ri)=>({r,ri})).reverse().forEach(({r,ri})=>{
 const next=(s.rounds[ri+1]||{courts:s.courts}).courts;
-const courtOf={};next.forEach((c,ci)=>c.players.forEach(id=>courtOf[id]=ci));
 h+='<div class="card round-summary"><div class="round-summary-title">Round '+(ri+1)+' result</div>';
-r.courts.forEach((c,ci)=>{
-const{ranked,ptMap,winMap}=tallyCourt(c,s.rankBasis);
-h+='<div class="round-summary-court">Court '+(ci+1)+'</div>';
-ranked.forEach((id,i)=>{
-const to=courtOf[id];
-const tag=to===undefined||to===ci?'':to<ci?'<span class="sb-tag tag-up">▲ Court '+(to+1)+'</span>':'<span class="sb-tag tag-down">▼ Court '+(to+1)+'</span>';
-h+='<div class="sb-row"><span class="sb-rank">'+(i+1)+'</span><span class="sb-name">'+esc(nameOf(id))+'</span><span class="sb-pts">'+(s.rankBasis==='wins'?(winMap[id]||0)+'W · ':'')+(ptMap[id]||0)+' pts</span>'+tag+'</div>';
-});
-});
+h+=roundStandingsHtml(r,s.rankBasis,next);
 h+='<details class="round-games"><summary>Game scores</summary>';
 r.courts.forEach((c,ci)=>{
 h+='<div style="font-size:12px;margin:8px 0 3px;"><strong>Court '+(ci+1)+'</strong></div>';
@@ -2059,7 +2072,25 @@ if(changes.length)h+='<div style="font-size:11px;color:var(--muted);margin-top:6
 }
 // game-by-game scores are folded away (only the newest session starts open) so the list stays scannable on a phone
 const nGames=roundsArr.reduce((n,r)=>n+r.courts.reduce((m,c)=>m+c.games.length,0),0);
-h+='<details class="round-games"'+(idx===0?' open':'')+'><summary>Games ('+nGames+')</summary>';
+if(nGames){
+// round-by-round movement: ▲/▼ court moves between rounds, then each player's ladder move
+const deltaById={};const idByName={};S.players.forEach(p=>idByName[p.name]=p.id);
+(s.rankChanges||[]).forEach(r=>{const id=idByName[r.name];if(id!==undefined)deltaById[id]=r.delta;});
+const after=s.ranksAfter||{};
+const finalMove=id=>{
+const d=deltaById[id]||0,a=after[id];
+if(a===undefined)return d>0?'<span class="sb-tag tag-up">▲'+d+'</span>':d<0?'<span class="sb-tag tag-down">▼'+(-d)+'</span>':'';
+const txt='#'+(a+d)+' → #'+a;
+return d>0?'<span class="sb-tag tag-up">'+txt+'</span>':d<0?'<span class="sb-tag tag-down">'+txt+'</span>':'<span class="sb-tag tag-same">'+txt+'</span>';
+};
+h+='<details class="round-games"'+(idx===0?' open':'')+'><summary>Round by round</summary>';
+roundsArr.forEach((r,ri)=>{
+h+='<div class="round-summary-title" style="margin-top:10px;">Round '+(ri+1)+(ri===roundsArr.length-1?' · final':'')+'</div>';
+h+=roundStandingsHtml(r,s.rankBasis||'points',roundsArr[ri+1]?roundsArr[ri+1].courts:null,finalMove,id=>after[id]);
+});
+h+='</details>';
+}
+h+=nGames?'<details class="round-games"><summary>Game scores ('+nGames+')</summary>':'<div hidden>';
 roundsArr.forEach((r,ri)=>{
 if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--accent);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
 r.courts.forEach((c,ci)=>{
@@ -2071,7 +2102,7 @@ h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+
 });
 });
 });
-h+='</details>';
+h+=nGames?'</details>':'</div>';
 h+='</div>';
 });
 root.innerHTML=h;
