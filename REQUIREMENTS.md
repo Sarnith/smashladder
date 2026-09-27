@@ -67,7 +67,7 @@ Items are grouped so related changes ship together. Original request numbers are
 - **A1** — Any score, current or earlier round, blocks Cancel.
 - **C2** — Hard limit at 15 / 21 by default; deuce is a per-court toggle. Deuce caps: 30 for 21-pt games, 21 for 15-pt games (BWF 15-pt format).
 - **C3** — "RTL" means entering the right-hand team's score first.
-- **D2** — Tie at the relegation line: the player who moved up into this court last round stays up.
+- **D2** — Ties after wins and points: the player who moved up into this court last round stays up; if still tied, the **lower-ranked (climbing) player** wins the tie (changed 27 Sep after reviewing the 27 Sept session — was higher-ranked).
 - **E1** — Last 5 sessions as columns on the ladder.
 - **G1** — All four palettes offered as themes in Profile, each with light/dark; default Court green + follow system.
 
