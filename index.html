@@ -1566,7 +1566,8 @@ if(g.s1>g.s2)g.pair1.forEach(id=>winMap[id]++);else g.pair2.forEach(id=>winMap[i
 }
 });
 // Order: wins (when ranking by wins) → points → a player who moved up into this court last round
-// beats one who was already here (the climber stays up) → current ladder rank.
+// beats one who was already here → the lower-ranked player on the ladder. Ties always favour
+// whoever is climbing: to hold a place you have to beat the challenger, not just draw.
 const climbers=court.climbers||[];
 const ranked=[...court.players].sort((a,b)=>{
 if(rankBasis==='wins'){
@@ -1575,7 +1576,7 @@ if(dw!==0)return dw;
 }
 const d=(ptMap[b]||0)-(ptMap[a]||0);if(d!==0)return d;
 const dc=climbers.includes(b)-climbers.includes(a);if(dc!==0)return dc;
-return gp(a).rank-gp(b).rank;
+return gp(b).rank-gp(a).rank;
 });
 return{ranked,ptMap,winMap,players:court.players};
 }
