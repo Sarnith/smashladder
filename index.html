@@ -174,6 +174,7 @@ outline:none;cursor:pointer;flex-shrink:0;
 .court-fmt{font-size:11px;color:var(--muted);}
 .court-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
 .pill{font-size:12px;font-weight:600;background:var(--court-line);border:1px solid var(--border);border-radius:20px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px;}
+.court-no{font-family:'Space Mono',monospace;font-size:.8em;font-weight:400;color:var(--muted);margin-right:5px;}
 .pill-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:700;padding:0;line-height:1;}
 .max-score-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--muted);}
 .score-opt{padding:4px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Grotesk',sans-serif;}
@@ -1105,36 +1106,38 @@ pv.textContent=n+' players → '+sizes.map((g,i)=>'Court '+(i+1)+': '+g+' player
 function closeModal(){const m=el('setup-modal');if(m)m.remove();}
 
 // ── Pairings (doubles round-robin) ──────────────────────────────────────
+// 4, 5 and 6 follow the group's paper sheet order (players numbered 1..n by rank)
 function pairings4(ids){
 const[a,b,c,d]=ids;
 return[
 {pair1:[a,b],pair2:[c,d],sitOut:null,s1:null,s2:null},
-{pair1:[a,c],pair2:[b,d],sitOut:null,s1:null,s2:null},
-{pair1:[a,d],pair2:[b,c],sitOut:null,s1:null,s2:null}
+{pair1:[a,d],pair2:[b,c],sitOut:null,s1:null,s2:null},
+{pair1:[a,c],pair2:[b,d],sitOut:null,s1:null,s2:null}
 ];
 }
 function pairings5(ids){
 const[a,b,c,d,e]=ids;
 return[
 {pair1:[a,b],pair2:[c,d],sitOut:e,s1:null,s2:null},
-{pair1:[a,c],pair2:[b,e],sitOut:d,s1:null,s2:null},
-{pair1:[a,d],pair2:[c,e],sitOut:b,s1:null,s2:null},
-{pair1:[a,e],pair2:[b,d],sitOut:c,s1:null,s2:null},
-{pair1:[b,c],pair2:[d,e],sitOut:a,s1:null,s2:null}
+{pair1:[e,a],pair2:[b,c],sitOut:d,s1:null,s2:null},
+{pair1:[e,b],pair2:[a,d],sitOut:c,s1:null,s2:null},
+{pair1:[e,c],pair2:[b,d],sitOut:a,s1:null,s2:null},
+{pair1:[e,d],pair2:[a,c],sitOut:b,s1:null,s2:null}
 ];
 }
-// 6 and 7: every player plays 4 games, no partner repeats, opponents balanced
+// 6: every player plays 4 games, no partner repeats
 function pairings6(ids){
 const[a,b,c,d,e,f]=ids;
 return[
-{pair1:[b,e],pair2:[c,f],sitOut:[a,d],s1:null,s2:null},
-{pair1:[a,e],pair2:[b,d],sitOut:[c,f],s1:null,s2:null},
-{pair1:[a,c],pair2:[e,f],sitOut:[b,d],s1:null,s2:null},
-{pair1:[a,d],pair2:[b,c],sitOut:[e,f],s1:null,s2:null},
-{pair1:[b,f],pair2:[d,e],sitOut:[a,c],s1:null,s2:null},
-{pair1:[a,f],pair2:[c,d],sitOut:[b,e],s1:null,s2:null}
+{pair1:[a,b],pair2:[c,d],sitOut:[e,f],s1:null,s2:null},
+{pair1:[f,a],pair2:[b,e],sitOut:[c,d],s1:null,s2:null},
+{pair1:[f,c],pair2:[d,e],sitOut:[a,b],s1:null,s2:null},
+{pair1:[f,b],pair2:[a,d],sitOut:[c,e],s1:null,s2:null},
+{pair1:[e,a],pair2:[b,c],sitOut:[d,f],s1:null,s2:null},
+{pair1:[f,d],pair2:[c,e],sitOut:[a,b],s1:null,s2:null}
 ];
 }
+// 7: every player plays 4 games, no partner repeats, opponents balanced
 function pairings7(ids){
 const[a,b,c,d,e,f,g]=ids;
 return[
@@ -1353,6 +1356,8 @@ const climbers=court.climbers||[];
 const numCourts=s.courts.length;
 const courtScored=court.games.some(g=>g.s1!==null&&g.s2!==null);
 const pastLength=court.games.some(g=>g.s1!==null&&g.s2!==null&&Math.max(g.s1,g.s2)>court.maxScore);
+// each player's number on this court (1 = top), as used on the paper game sheet
+const numbered=id=>'<span class="court-no">'+(court.players.indexOf(id)+1)+'</span>'+nameOf(id);
 
 h+='<div class="court-block">'
 +'<div class="court-hdr"><span class="court-lbl">🏸 Court '+(ci+1)+(ci===0&&numCourts>1?' (Top)':ci===numCourts-1&&numCourts>1?' (Bottom)':'')+'</span>'
@@ -1361,7 +1366,7 @@ h+='<div class="court-block">'
 // Pills with remove buttons
 h+='<div class="court-pills">';
 court.players.forEach(id=>{
-h+='<span class="pill">'+nameOf(id)
+h+='<span class="pill">'+numbered(id)
 +' <button class="pill-remove" data-ci="'+ci+'" data-pid="'+id+'" title="Remove from session">✕</button></span>';
 });
 h+='</div>';
@@ -1388,10 +1393,10 @@ h+='<div class="game-card">'
 :'<span class="game-status-pending">● Enter score</span>')
 +'</div>'
 +'<div class="game-score-body">'
-+'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair1[1])+'</div>'
++'<div class="pair-col'+(scored?(w1?' won':' lost'):'')+'"><div class="pair-names-stacked">'+numbered(game.pair1[0])+'<br><span class="pair-amp">&amp;</span><br>'+numbered(game.pair1[1])+'</div>'
 +'<div class="score-inputs">'+box(1,scored?(w1?' winning':' losing'):'')+'</div></div>'
 +'<div class="vs-col"><span class="vs-text">VS</span>'+(scored?'<span class="vs-score">'+game.s1+'–'+game.s2+'</span>':'')+'</div>'
-+'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+nameOf(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+nameOf(game.pair2[1])+'</div>'
++'<div class="pair-col'+(scored?(w2?' won':' lost'):'')+'"><div class="pair-names-stacked">'+numbered(game.pair2[0])+'<br><span class="pair-amp">&amp;</span><br>'+numbered(game.pair2[1])+'</div>'
 +'<div class="score-inputs">'+box(2,scored?(w2?' winning':' losing'):'')+'</div></div>'
 +'</div>'
 +'<div class="score-msg" id="msg-'+ci+'-'+gi+'">'+(err?esc(err):'')+'</div>'
