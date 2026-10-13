@@ -2101,10 +2101,12 @@ roundsArr.forEach((r,ri)=>{
 if(roundsArr.length>1)h+='<div style="font-weight:700;color:var(--accent);font-size:12px;margin:8px 0 4px;">Round '+(ri+1)+'</div>';
 r.courts.forEach((c,ci)=>{
 if(ci>0)h+='<hr class="div">';
-h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--accent)">Court '+(ci+1)+':</strong> '+c.players.map(id=>nameOf(id)).join(', ')+'</div>';
+// same court numbers as the Session screen (1 = top of that court)
+const numbered=id=>{const n=c.players.indexOf(id)+1;return(n?'<span class="court-no">'+n+'</span>':'')+nameOf(id);};
+h+='<div style="font-size:12px;margin-bottom:5px;"><strong style="color:var(--accent)">Court '+(ci+1)+':</strong> '+c.players.map(numbered).join(', ')+'</div>';
 c.games.forEach((g,gi)=>{
 const sc=g.s1!==null&&g.s2!==null;
-h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(id=>nameOf(id)).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(id=>nameOf(id)).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
+h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;">G'+(gi+1)+': '+g.pair1.map(numbered).join(' & ')+' <strong style="color:var(--text)">'+(sc?g.s1:'?')+'</strong> – <strong style="color:var(--text)">'+(sc?g.s2:'?')+'</strong> '+g.pair2.map(numbered).join(' & ')+(g.sitOut?' <em>(sitting: '+sitOutNames(g)+')</em>':'')+'</div>';
 });
 });
 });
